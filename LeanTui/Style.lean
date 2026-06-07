@@ -2,6 +2,7 @@ import LeanTui.Ansi
 
 namespace LeanTui
 
+/-- The eight basic ANSI terminal colors supported by LeanTui styles. -/
 inductive Color where
   | black
   | red
@@ -15,6 +16,7 @@ deriving BEq, Repr
 
 namespace Color
 
+/-- Returns the ANSI foreground color code for a color. -/
 def fgCode : Color -> String
   | black => "30"
   | red => "31"
@@ -25,6 +27,7 @@ def fgCode : Color -> String
   | cyan => "36"
   | white => "37"
 
+/-- Returns the ANSI background color code for a color. -/
 def bgCode : Color -> String
   | black => "40"
   | red => "41"
@@ -37,22 +40,30 @@ def bgCode : Color -> String
 
 end Color
 
+/-- Text styling attributes for a terminal cell. -/
 structure Style where
+  /-- Optional foreground color. -/
   fg : Option Color := none
+  /-- Optional background color. -/
   bg : Option Color := none
+  /-- Whether to render text using bold/intense styling. -/
   bold : Bool := false
+  /-- Whether to render text with inverse foreground/background colors. -/
   inverse : Bool := false
 deriving BEq, Repr
 
 namespace Style
 
+/-- The default style with no colors or extra attributes. -/
 def plain : Style := {}
 
+/-- Joins strings with a separator. -/
 partial def joinWith (sep : String) : List String -> String
   | [] => ""
   | [x] => x
   | x :: xs => x ++ sep ++ joinWith sep xs
 
+/-- Returns the ANSI SGR codes needed to render a style. -/
 def codes (style : Style) : List String :=
   let codes := ([] : List String)
   let codes := if style.bold then "1" :: codes else codes
@@ -67,6 +78,7 @@ def codes (style : Style) : List String :=
     | none => codes
   codes.reverse
 
+/-- Renders a style as an ANSI SGR escape sequence. -/
 def render (style : Style) : String :=
   match style.codes with
   | [] => Ansi.reset

@@ -3,39 +3,43 @@ import LeanTui
 open LeanTui
 
 structure DemoModel where
+  size : Size
   row : Nat := 2
   col : Nat := 4
   message : String := "Use cursor keys, Home, and End. Press q to quit."
 
-def demoSize : Size :=
+def fallbackSize : Size :=
   { rows := 12, cols := 72 }
 
 def clampTo (limit value : Nat) : Nat :=
-  if value >= limit then limit - 1 else value
+  if limit == 0 then 0 else if value >= limit then limit - 1 else value
+
+def initModel (size : Size) : DemoModel :=
+  { size := size, row := clampTo size.rows 2, col := clampTo size.cols 4 }
 
 def moveDemo (key : Key) (model : DemoModel) : Step DemoModel :=
   if key == Key.home then
     Step.continue { model with col := 0, message := "home" }
   else if key == Key.endKey then
-    Step.continue { model with col := demoSize.cols - 1, message := "end" }
+    Step.continue { model with col := clampTo model.size.cols model.size.cols, message := "end" }
   else
     match key with
     | Key.char 'q' => Step.quit { model with message := "Goodbye." }
     | Key.left =>
         Step.continue { model with col := model.col - 1, message := "left" }
     | Key.right =>
-        Step.continue { model with col := clampTo demoSize.cols (model.col + 1), message := "right" }
+        Step.continue { model with col := clampTo model.size.cols (model.col + 1), message := "right" }
     | Key.up =>
         Step.continue { model with row := model.row - 1, message := "up" }
     | Key.down =>
-        Step.continue { model with row := clampTo demoSize.rows (model.row + 1), message := "down" }
+        Step.continue { model with row := clampTo model.size.rows (model.row + 1), message := "down" }
     | other =>
         Step.continue { model with message := "Unhandled key: " ++ reprStr other }
 
 def renderDemo (model : DemoModel) : Screen :=
   let titleStyle : Style := { fg := some Color.cyan, bold := true }
   let cursorStyle : Style := { fg := some Color.black, bg := some Color.white, bold := true }
-  let screen := Screen.blank demoSize
+  let screen := Screen.blank model.size
   let screen := screen.putString 0 0 "LeanTui demo" titleStyle
   let screen := screen.putString 1 0 model.message
   let screen := screen.putString 3 0 "The highlighted cell is redrawn incrementally."
@@ -43,10 +47,11 @@ def renderDemo (model : DemoModel) : Screen :=
   let baseCell := screen.get { row := model.row, col := model.col }
   screen.putChar model.row model.col baseCell.ch cursorStyle
 
-def demoApp : App DemoModel :=
-  { init := {}
+def demoApp (size : Size) : App DemoModel :=
+  { init := initModel size
     view := renderDemo
     update := moveDemo }
 
-def main : IO Unit :=
-  App.run demoApp
+def main : IO Unit := do
+  let size := (← Terminal.size?).getD fallbackSize
+  App.run (demoApp size)

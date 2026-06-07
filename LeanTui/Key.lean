@@ -1,28 +1,44 @@
 namespace LeanTui
 
+/-- A decoded terminal key press. -/
 inductive Key where
+  /-- A printable character key. -/
   | char (ch : Char)
+  /-- The Enter or Return key. -/
   | enter
+  /-- The Tab key. -/
   | tab
+  /-- Backspace or Delete-as-backspace. -/
   | backspace
+  /-- The Escape key. -/
   | escape
+  /-- Up arrow. -/
   | up
+  /-- Down arrow. -/
   | down
+  /-- Right arrow. -/
   | right
+  /-- Left arrow. -/
   | left
+  /-- Home key. -/
   | home
+  /-- End key. -/
   | endKey
+  /-- Forward delete key. -/
   | delete
+  /-- An unrecognized escape sequence or byte sequence. -/
   | unknown (bytes : String)
 deriving BEq, Repr
 
 namespace Key
 
+/-- Decodes a single command character into a key. -/
 def fromCommandChar : Char -> Key
   | '\n' => enter
   | '\t' => tab
   | ch => char ch
 
+/-- Decodes a complete escape sequence into a key. -/
 def decodeEscape : List Char -> Key
   | ['\x1b'] => escape
   | ['\x1b', '[', 'A'] => up
@@ -38,6 +54,7 @@ def decodeEscape : List Char -> Key
   | ['\x1b', '[', '3', '~'] => delete
   | chars => unknown (String.ofList chars)
 
+/-- Decodes a complete input string into a single key. -/
 def decode (input : String) : Key :=
   match input.toList with
   | [] => enter
