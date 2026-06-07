@@ -88,6 +88,24 @@ partial def putStringLoop (screen : Screen) (row col : Nat) (chars : List Char) 
 def putString (screen : Screen) (row col : Nat) (text : String) (style : Style := Style.plain) : Screen :=
   putStringLoop screen row col text.toList style
 
+/-- Worker for writing multiple strings in consecutive rows. -/
+partial def putStringsLoop
+    (screen : Screen) (row col index : Nat) (lines : Array String) (style : Style) : Screen :=
+  if index >= lines.size then
+    screen
+  else
+    let line := lines.getD index ""
+    let screen := screen.putString (row + index) col line style
+    putStringsLoop screen row col (index + 1) lines style
+
+/--
+Writes strings into consecutive rows starting at a zero-based top-left corner.
+`putString` is the single-line special case of this function.
+-/
+def putStrings
+    (screen : Screen) (row col : Nat) (lines : Array String) (style : Style := Style.plain) : Screen :=
+  putStringsLoop screen row col 0 lines style
+
 /-- Worker for rendering every row of a screen into ANSI text. -/
 partial def renderFullRows (screen : Screen) (row : Nat) (acc : String) : String :=
   if row >= screen.size.rows then
