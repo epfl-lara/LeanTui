@@ -42,11 +42,6 @@ def insertTyped (ch : Char) (model : DemoModel) : DemoModel :=
   advanceCursor model
 
 def moveDemo (key : Key) (model : DemoModel) : Step DemoModel :=
-  if key == Key.home then
-    Step.continue { model with col := 0, message := "home" }
-  else if key == Key.endKey then
-    Step.continue { model with col := clampTo model.size.cols model.size.cols, message := "end" }
-  else
     match key with
     | Key.escape => Step.quit { model with message := "Goodbye." }
     | Key.left =>
@@ -57,6 +52,10 @@ def moveDemo (key : Key) (model : DemoModel) : Step DemoModel :=
         Step.continue { model with row := model.row - 1, message := "up" }
     | Key.down =>
         Step.continue { model with row := clampTo model.size.rows (model.row + 1), message := "down" }
+    | Key.home => Step.continue { model with col := 0, message := "home" }
+    | Key.endKey => Step.continue {
+        model with col := clampTo model.size.cols model.size.cols, message := "end"
+      }
     | other =>
         match other.toInputChar? with
         | some ch => Step.continue (insertTyped ch model)
