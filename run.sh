@@ -1,1 +1,1 @@
-lake exe tui-demo
+lake exe screen-edit-demo

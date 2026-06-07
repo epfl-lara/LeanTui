@@ -169,7 +169,7 @@ def keyFromChar (ch : Char) : Key :=
   else if isBackspaceByte ch then
     Key.backspace
   else
-    Key.char ch
+    Key.fromPrintableChar ch
 
 /-- Parses one key from the front of a character buffer. -/
 def parseOne : List Char -> ParseResult
@@ -212,11 +212,21 @@ partial def parseBuffered (keys : List Key) : List Char -> List Key × List Char
       | ParseResult.key key rest => parseBuffered (key :: keys) rest
       | ParseResult.incomplete => (keys.reverse, chars)
 
+/-- Finishes a buffered lone Escape key when no more input bytes are available. -/
+def flushLoneEscape (keys : List Key) : List Char -> List Key × List Char
+  | ['\x1b'] => (keys ++ [Key.escape], [])
+  | rest => (keys, rest)
+
 /-- Polls standard input and returns all complete keys currently available. -/
 def pollKeys (reader : InputReader) : IO (List Key) := do
   let buffered ← reader.buffer.get
   let available ← readAvailable
   let (keys, rest) := parseBuffered [] (buffered ++ available)
+  let (keys, rest) :=
+    if available.isEmpty then
+      flushLoneEscape keys rest
+    else
+      (keys, rest)
   reader.buffer.set rest
   pure keys
 

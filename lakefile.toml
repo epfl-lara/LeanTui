@@ -6,5 +6,5 @@ defaultTargets = ["LeanTui"]
 name = "LeanTui"
 
 [[lean_exe]]
-name = "tui-demo"
-root = "Examples.Demo"
+name = "screen-edit-demo"
+root = "Examples.ScreenEditDemo"

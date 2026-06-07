@@ -32,11 +32,27 @@ deriving BEq, Repr
 
 namespace Key
 
+/-- Returns whether a character is printable ASCII. -/
+def isPrintableAscii (ch : Char) : Bool :=
+  ' '.toNat <= ch.toNat && ch.toNat <= '~'.toNat
+
+/-- Converts an ordinary typed character into a key. -/
+def fromPrintableChar (ch : Char) : Key :=
+  if isPrintableAscii ch then
+    char ch
+  else
+    unknown (String.singleton ch)
+
+/-- Returns the character inserted by a printable key. -/
+def toInputChar? : Key -> Option Char
+  | char ch => some ch
+  | _ => none
+
 /-- Decodes a single command character into a key. -/
 def fromCommandChar : Char -> Key
   | '\n' => enter
   | '\t' => tab
-  | ch => char ch
+  | ch => fromPrintableChar ch
 
 /-- Decodes a complete escape sequence into a key. -/
 def decodeEscape : List Char -> Key
