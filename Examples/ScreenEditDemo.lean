@@ -43,6 +43,7 @@ def insertTyped (ch : Char) (model : DemoModel) : DemoModel :=
 
 def moveDemo (key : Key) (model : DemoModel) : Step DemoModel :=
     match key with
+    | Key.ctrl 'l' => Step.redrawFull { model with message := "full render" }
     | Key.escape => Step.quit { model with message := "Goodbye." }
     | Key.left =>
         Step.continue { model with col := model.col - 1, message := "left" }

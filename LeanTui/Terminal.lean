@@ -169,7 +169,9 @@ def keyFromChar (ch : Char) : Key :=
   else if isBackspaceByte ch then
     Key.backspace
   else
-    Key.fromPrintableChar ch
+    match Key.fromControlChar? ch with
+    | some key => key
+    | none => Key.fromPrintableChar ch
 
 /-- Parses one key from the front of a character buffer. -/
 def parseOne : List Char -> ParseResult

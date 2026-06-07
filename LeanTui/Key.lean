@@ -4,6 +4,8 @@ namespace LeanTui
 inductive Key where
   /-- A printable character key. -/
   | char (ch : Char)
+  /-- A Ctrl-modified letter key, stored as a lowercase character. -/
+  | ctrl (ch : Char)
   /-- The Enter or Return key. -/
   | enter
   /-- The Tab key. -/
@@ -36,6 +38,19 @@ namespace Key
 def isPrintableAscii (ch : Char) : Bool :=
   ' '.toNat <= ch.toNat && ch.toNat <= '~'.toNat
 
+/-- Converts a control-byte value from Ctrl-A through Ctrl-Z into its letter. -/
+def controlLetter? (value : Nat) : Option Char :=
+  if 1 <= value && value <= 26 then
+    some (Char.ofNat ('a'.toNat + value - 1))
+  else
+    none
+
+/-- Converts an ASCII control character into a Ctrl-modified key when possible. -/
+def fromControlChar? (ch : Char) : Option Key :=
+  match controlLetter? ch.toNat with
+  | some letter => some (ctrl letter)
+  | none => none
+
 /-- Converts an ordinary typed character into a key. -/
 def fromPrintableChar (ch : Char) : Key :=
   if isPrintableAscii ch then
@@ -52,7 +67,10 @@ def toInputChar? : Key -> Option Char
 def fromCommandChar : Char -> Key
   | '\n' => enter
   | '\t' => tab
-  | ch => fromPrintableChar ch
+  | ch =>
+      match fromControlChar? ch with
+      | some key => key
+      | none => fromPrintableChar ch
 
 /-- Decodes a complete escape sequence into a key. -/
 def decodeEscape : List Char -> Key

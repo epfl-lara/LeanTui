@@ -6,6 +6,8 @@ namespace LeanTui
 inductive Step (Model : Type) where
   /-- Continue running with the next model. -/
   | continue (model : Model)
+  /-- Continue running and redraw the next frame from scratch. -/
+  | redrawFull (model : Model)
   /-- Stop the app after rendering the final model. -/
   | quit (model : Model)
 
@@ -28,6 +30,8 @@ namespace App
 structure FrameState (Model : Type) where
   /-- Current model. -/
   model : Model
+  /-- Whether the next frame should be rendered from scratch. -/
+  redrawFull : Bool := false
   /-- Whether the app should stop after this frame. -/
   quit : Bool := false
 
@@ -46,8 +50,19 @@ partial def applyKeys (app : App Model) (state : FrameState Model) : List Key ->
         state
       else
         match app.update key state.model with
-        | Step.quit model => applyKeys app { model := model, quit := true } rest
-        | Step.continue model => applyKeys app { model := model } rest
+        | Step.quit model =>
+            applyKeys app { model := model, redrawFull := state.redrawFull, quit := true } rest
+        | Step.redrawFull model =>
+            applyKeys app { model := model, redrawFull := true } rest
+        | Step.continue model =>
+            applyKeys app { model := model, redrawFull := state.redrawFull } rest
+
+/-- Draws the next frame, either as a full render or as a diff. -/
+def drawFrame (redrawFull : Bool) (previous next : Screen) : IO Unit := do
+  if redrawFull then
+    Terminal.drawFull next
+  else
+    Terminal.drawDiff previous next
 
 /-- Runs the app loop using nonblocking raw input polling. -/
 partial def loopWithReader
@@ -58,7 +73,7 @@ partial def loopWithReader
   let keys ← reader.pollKeys
   let state := applyKeys app { model := model } keys
   let next := app.view state.model
-  Terminal.drawDiff previous next
+  drawFrame state.redrawFull previous next
   if state.quit then
     pure ()
   else
@@ -74,7 +89,7 @@ partial def loopWithReadKey
   let key ← readKey
   let state := applyKeys app { model := model } [key]
   let next := app.view state.model
-  Terminal.drawDiff previous next
+  drawFrame state.redrawFull previous next
   if state.quit then
     pure ()
   else
