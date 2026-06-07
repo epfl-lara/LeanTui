@@ -2,7 +2,7 @@ import LeanTui.Ansi
 
 namespace LeanTui
 
-/-- The eight basic ANSI terminal colors supported by LeanTui styles. -/
+/-- ANSI terminal colors supported by LeanTui styles. -/
 inductive Color where
   | black
   | red
@@ -12,6 +12,7 @@ inductive Color where
   | magenta
   | cyan
   | white
+  | orange
 deriving BEq, Repr
 
 namespace Color
@@ -26,6 +27,7 @@ def fgCode : Color -> String
   | magenta => "35"
   | cyan => "36"
   | white => "37"
+  | orange => "38;5;208"
 
 /-- Returns the ANSI background color code for a color. -/
 def bgCode : Color -> String
@@ -37,6 +39,7 @@ def bgCode : Color -> String
   | magenta => "45"
   | cyan => "46"
   | white => "47"
+  | orange => "48;5;208"
 
 end Color
 

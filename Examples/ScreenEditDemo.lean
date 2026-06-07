@@ -20,15 +20,17 @@ partial def blankRow (screen : Screen) (row col : Nat) : Screen :=
   else
     blankRow (screen.putChar row col ' ') row (col + 1)
 
+
 def setMessage (model : DemoModel) (message : String) : DemoModel :=
   let screen := blankRow model.screen 1 0
-  let screen := screen.putString 1 0 message
+  let messageStyle: Style := { fg := some Color.black, bg := some Color.yellow, bold := true }
+  let screen := screen.putString 1 0 message messageStyle
   { model with screen := screen }
 
 def baseScreen (size : Size) : Screen :=
   let titleStyle : Style := { fg := some Color.cyan, bold := true }
   let screen := Screen.blank size
-  let screen := screen.putString 0 0 "LeanTui demo: ESC to quit" titleStyle
+  let screen := screen.putString 0 0 "Screen Edit Demo for LeanTui. Press ESC to quit" titleStyle
   screen.putStrings 2 3 #[
     "Type printable keys, move with cursor keys, Home, and End. Press Esc to quit.",
     "The highlighted cell is redrawn incrementally.",
@@ -79,7 +81,7 @@ def moveDemo (key : Key) (model : DemoModel) : Step DemoModel :=
         | none => Step.continue (setMessage model ("Unhandled key: " ++ reprStr other))
 
 def renderDemo (model : DemoModel) : Screen :=
-  let cursorStyle : Style := { fg := some Color.black, bg := some Color.white, bold := true }
+  let cursorStyle : Style := { fg := some Color.black, bg := some Color.orange, bold := true }
   let screen := model.screen
   let baseCell := screen.get { row := model.row, col := model.col }
   screen.putChar model.row model.col baseCell.ch cursorStyle
