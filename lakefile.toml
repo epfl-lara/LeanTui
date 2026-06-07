@@ -1,0 +1,10 @@
+name = "LeanTui"
+version = "0.1.0"
+defaultTargets = ["LeanTui"]
+
+[[lean_lib]]
+name = "LeanTui"
+
+[[lean_exe]]
+name = "tui-demo"
+root = "Examples.Demo"
