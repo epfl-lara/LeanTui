@@ -7,6 +7,8 @@ structure DemoModel where
   screen : Screen
   row : Nat := 2
   col : Nat := 4
+  fileLines : Array String := #[]
+  scrollRow : Nat := 0
 
 def fallbackSize : Size :=
   { rows := 12, cols := 72 }
@@ -27,22 +29,20 @@ def setMessage (model : DemoModel) (message : String) : DemoModel :=
   let screen := screen.putString 1 0 message messageStyle
   { model with screen := screen }
 
-def baseScreen (size : Size) : Screen :=
+def baseScreen (size : Size) (fileLines : Array String) : Screen :=
   let titleStyle : Style := { fg := some Color.cyan, bold := true }
   let screen := Screen.blank size
   let screen := screen.putString 0 0 "Screen Edit Demo for LeanTui. Press ESC to quit" titleStyle
-  screen.putStrings 2 3 #[
-    "Type printable keys, move with cursor keys, Home, and End. Press Esc to quit.",
-    "The highlighted cell is redrawn incrementally.",
-    "Cursor keys move the highlighted terminal-style cell.",
-    "Typing symbols replaces current character"
-  ]
+  let visibleRows := if size.rows <= 2 then 0 else size.rows - 2
+  let visibleLines := fileLines.extract 0 visibleRows
+  screen.putStrings 2 0 visibleLines
 
-def initModel (size : Size) : DemoModel :=
+def initModel (size : Size) (fileLines : Array String) : DemoModel :=
   { size := size
-    screen := baseScreen size
+    screen := baseScreen size fileLines
     row := clampTo size.rows 2
-    col := clampTo size.cols 4 }
+    col := clampTo size.cols 4
+    fileLines := fileLines }
 
 def advanceCursor (model : DemoModel) : DemoModel :=
   if model.size.rows == 0 || model.size.cols == 0 then
@@ -86,11 +86,26 @@ def renderDemo (model : DemoModel) : Screen :=
   let baseCell := screen.get { row := model.row, col := model.col }
   screen.putChar model.row model.col baseCell.ch cursorStyle
 
-def demoApp (size : Size) : App DemoModel :=
-  { init := initModel size
+def demoApp (size : Size) (fileLines : Array String) : App DemoModel :=
+  { init := initModel size fileLines
     view := renderDemo
     update := moveDemo }
 
-def main : IO Unit := do
+def parseArgs (args : List String) : Option String :=
+  match args with
+  | [] => none
+  | path :: _ => some path
+
+def readFileLines (path : String) : IO (Array String) := do
+  let content ← IO.FS.readFile path
+  pure ((content.split '\n').map String.Slice.toString).toArray
+
+def main (args : List String) : IO Unit := do
   let size := (← Terminal.size?).getD fallbackSize
-  App.run (demoApp size)
+  match parseArgs args with
+  | some path =>
+      let lines ← readFileLines path
+      App.run (demoApp size lines)
+  | none =>
+      IO.println "Usage: screen-edit-demo <file>"
+      IO.Process.exit 1
