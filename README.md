@@ -16,11 +16,17 @@ standard `IO` facilities and writes strings to the terminal.
 - `LeanTui.Terminal`: terminal IO helpers.
 - `LeanTui.App`: a simple `init`/`view`/`update` event loop.
 
-## Demo
+## Demos
+
+### screen-edit-demo
 
 ```bash
-lake exe tui-demo
+lake exe screen-edit-demo README.md
 ```
+
+  * move with cursor keys
+  * edit screen content
+  * exit using ESC key
 
 The demo enters the terminal's alternate screen and tries to switch the
 controlling terminal into raw no-echo mode with `stty -f /dev/tty` on macOS,
