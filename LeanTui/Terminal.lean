@@ -78,7 +78,7 @@ def sttyTargets : List SttyTarget :=
   ]
 
 /-- Tries an `stty` operation on targets until one succeeds. -/
-partial def firstStty? {α : Type} (op : SttyTarget -> IO (Option α)) : List SttyTarget ->
+def firstStty? {α : Type} (op : SttyTarget -> IO (Option α)) : List SttyTarget ->
     IO (Option α)
   | [] => pure none
   | target :: rest => do
@@ -211,7 +211,7 @@ inductive SgrMouseScan where
 deriving Nonempty
 
 /-- Scans characters after `ESC [ <` until the SGR mouse final byte. -/
-partial def scanSgrMouse (payload : List Char) : List Char -> SgrMouseScan
+def scanSgrMouse (payload : List Char) : List Char -> SgrMouseScan
   | [] => SgrMouseScan.incomplete
   | 'M' :: rest => SgrMouseScan.complete payload.reverse 'M' rest
   | 'm' :: rest => SgrMouseScan.complete payload.reverse 'm' rest
@@ -222,7 +222,7 @@ partial def scanSgrMouse (payload : List Char) : List Char -> SgrMouseScan
         SgrMouseScan.invalid
 
 /-- Parses an unsigned natural number from a list of decimal digits. -/
-partial def parseDigitsNat? (chars : List Char) : Option Nat :=
+def parseDigitsNat? (chars : List Char) : Option Nat :=
   match chars with
   | [] => none
   | _ =>
@@ -232,7 +232,7 @@ partial def parseDigitsNat? (chars : List Char) : Option Nat :=
         none
 
 /-- Splits a list of characters on semicolon separators. -/
-partial def splitSemicolonLoop (current : List Char) (parts : List (List Char)) : List Char ->
+def splitSemicolonLoop (current : List Char) (parts : List (List Char)) : List Char ->
     List (List Char)
   | [] => (current.reverse :: parts).reverse
   | ';' :: rest => splitSemicolonLoop [] (current.reverse :: parts) rest
@@ -316,11 +316,16 @@ def readAvailable : IO (List Char) := do
   pure (bytes.toList.map byteToChar)
 
 /-- Parses as many complete keys as possible from a character buffer. -/
-partial def parseBuffered (keys : List Key) : List Char -> List Key × List Char
-  | chars =>
+def parseBufferedFuel (keys : List Key) (chars : List Char) : Nat -> List Key × List Char
+  | 0 => (keys.reverse, chars)
+  | fuel + 1 =>
       match parseOne chars with
-      | ParseResult.key key rest => parseBuffered (key :: keys) rest
+      | ParseResult.key key rest => parseBufferedFuel (key :: keys) rest fuel
       | ParseResult.incomplete => (keys.reverse, chars)
+
+/-- Parses as many complete keys as possible from a character buffer. -/
+def parseBuffered (keys : List Key) (chars : List Char) : List Key × List Char :=
+  parseBufferedFuel keys chars (chars.length + 1)
 
 /-- Finishes a buffered lone Escape key when no more input bytes are available. -/
 def flushLoneEscape (keys : List Key) : List Char -> List Key × List Char

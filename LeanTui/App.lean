@@ -65,7 +65,7 @@ def write (meter : OutputMeter) (text : String) : IO Unit := do
 end OutputMeter
 
 /-- Applies a batch of keys to frame state in order. -/
-partial def applyKeys (app : App Model) (state : FrameState Model) : List Key -> FrameState Model
+def applyKeys (app : App Model) (state : FrameState Model) : List Key -> FrameState Model
   | [] => state
   | key :: rest =>
       if state.quit then

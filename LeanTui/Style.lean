@@ -61,7 +61,7 @@ namespace Style
 def plain : Style := {}
 
 /-- Joins strings with a separator. -/
-partial def joinWith (sep : String) : List String -> String
+def joinWith (sep : String) : List String -> String
   | [] => ""
   | [x] => x
   | x :: xs => x ++ sep ++ joinWith sep xs

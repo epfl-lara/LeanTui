@@ -78,7 +78,7 @@ def putChar (screen : Screen) (row col : Nat) (ch : Char) (style : Style := Styl
   screen.set { row := row, col := col } { ch := ch, style := style }
 
 /-- Worker for writing a list of characters across a row. -/
-partial def putStringLoop (screen : Screen) (row col : Nat) (chars : List Char) (style : Style) : Screen :=
+def putStringLoop (screen : Screen) (row col : Nat) (chars : List Char) (style : Style) : Screen :=
   match chars with
   | [] => screen
   | ch :: rest =>
@@ -89,14 +89,12 @@ def putString (screen : Screen) (row col : Nat) (text : String) (style : Style :
   putStringLoop screen row col text.toList style
 
 /-- Worker for writing multiple strings in consecutive rows. -/
-partial def putStringsLoop
-    (screen : Screen) (row col index : Nat) (lines : Array String) (style : Style) : Screen :=
-  if index >= lines.size then
-    screen
-  else
-    let line := lines.getD index ""
-    let screen := screen.putString (row + index) col line style
-    putStringsLoop screen row col (index + 1) lines style
+def putStringsLoop
+    (screen : Screen) (row col : Nat) (lines : List String) (style : Style) : Screen :=
+  match lines with
+  | [] => screen
+  | line :: rest =>
+      putStringsLoop (screen.putString row col line style) (row + 1) col rest style
 
 /--
 Writes strings into consecutive rows starting at a zero-based top-left corner.
@@ -104,28 +102,35 @@ Writes strings into consecutive rows starting at a zero-based top-left corner.
 -/
 def putStrings
     (screen : Screen) (row col : Nat) (lines : Array String) (style : Style := Style.plain) : Screen :=
-  putStringsLoop screen row col 0 lines style
+  putStringsLoop screen row col lines.toList style
+
+/-- Worker for rendering columns in one row into ANSI text. -/
+def renderFullCols (screen : Screen) (row : Nat) (cols : List Nat) (line : String) : String :=
+  match cols with
+  | [] => line
+  | col :: rest =>
+      renderFullCols screen row rest (line ++ (screen.get { row := row, col := col }).render)
 
 /-- Worker for rendering every row of a screen into ANSI text. -/
-partial def renderFullRows (screen : Screen) (row : Nat) (acc : String) : String :=
-  if row >= screen.size.rows then
-    acc
-  else
-    let lineStart := Ansi.moveCursor row 0
-    let rec renderCols (col : Nat) (line : String) : String :=
-      if col >= screen.size.cols then
-        line
-      else
-        renderCols (col + 1) (line ++ (screen.get { row := row, col := col }).render)
-    renderFullRows screen (row + 1) (acc ++ lineStart ++ renderCols 0 "")
+def renderFullRows (screen : Screen) (rows : List Nat) (acc : String) : String :=
+  match rows with
+  | [] => acc
+  | row :: rest =>
+      let lineStart := Ansi.moveCursor row 0
+      let line := renderFullCols screen row (List.range screen.size.cols) ""
+      renderFullRows screen rest (acc ++ lineStart ++ line)
 
 /-- Renders the entire screen as ANSI text, including cursor hide and clear commands. -/
 def renderFull (screen : Screen) : String :=
-  Ansi.hideCursor ++ Ansi.clearScreen ++ renderFullRows screen 0 "" ++ Ansi.reset
+  Ansi.hideCursor ++ Ansi.clearScreen ++ renderFullRows screen (List.range screen.size.rows) "" ++
+    Ansi.reset
 
 /-- Worker for rendering a contiguous run of changed cells sharing one style. -/
-partial def renderStyleRun
-    (old next : Screen) (i rowEnd : Nat) (style : Style) (text : String) : Nat × String :=
+def renderStyleRunFuel
+    (old next : Screen) (i rowEnd fuel : Nat) (style : Style) (text : String) : Nat × String :=
+  match fuel with
+  | 0 => (i, style.render ++ text ++ Ansi.reset)
+  | fuel + 1 =>
   if i >= rowEnd || i >= next.cells.size then
     (i, style.render ++ text ++ Ansi.reset)
   else
@@ -134,10 +139,19 @@ partial def renderStyleRun
     if oldCell == nextCell || !(nextCell.style == style) then
       (i, style.render ++ text ++ Ansi.reset)
     else
-      renderStyleRun old next (i + 1) rowEnd style (text ++ String.singleton nextCell.ch)
+      renderStyleRunFuel old next (i + 1) rowEnd fuel style (text ++ String.singleton nextCell.ch)
+
+/-- Worker for rendering a contiguous run of changed cells sharing one style. -/
+def renderStyleRun
+    (old next : Screen) (i rowEnd : Nat) (style : Style) (text : String) : Nat × String :=
+  renderStyleRunFuel old next i rowEnd (rowEnd - i + 1) style text
 
 /-- Worker for rendering changed cells until the end of a row. -/
-partial def renderChangedRun (old next : Screen) (i rowEnd : Nat) (acc : String) : Nat × String :=
+def renderChangedRunFuel (old next : Screen) (i rowEnd fuel : Nat) (acc : String) :
+    Nat × String :=
+  match fuel with
+  | 0 => (i, acc)
+  | fuel + 1 =>
   if i >= rowEnd || i >= next.cells.size then
     (i, acc)
   else
@@ -147,10 +161,17 @@ partial def renderChangedRun (old next : Screen) (i rowEnd : Nat) (acc : String)
       (i, acc)
     else
       let (j, rendered) := renderStyleRun old next i rowEnd nextCell.style ""
-      renderChangedRun old next j rowEnd (acc ++ rendered)
+      renderChangedRunFuel old next j rowEnd fuel (acc ++ rendered)
+
+/-- Worker for rendering changed cells until the end of a row. -/
+def renderChangedRun (old next : Screen) (i rowEnd : Nat) (acc : String) : Nat × String :=
+  renderChangedRunFuel old next i rowEnd (rowEnd - i + 1) acc
 
 /-- Worker for rendering an ANSI diff from one screen to another. -/
-partial def renderDiffLoop (old next : Screen) (i : Nat) (acc : String) : String :=
+def renderDiffLoopFuel (old next : Screen) (i fuel : Nat) (acc : String) : String :=
+  match fuel with
+  | 0 => acc ++ Ansi.reset
+  | fuel + 1 =>
   if i >= next.cells.size then
     acc ++ Ansi.reset
   else if next.size.cols == 0 then
@@ -159,13 +180,17 @@ partial def renderDiffLoop (old next : Screen) (i : Nat) (acc : String) : String
     let oldCell := old.cells.getD i Cell.blank
     let nextCell := next.cells.getD i Cell.blank
     if oldCell == nextCell then
-      renderDiffLoop old next (i + 1) acc
+      renderDiffLoopFuel old next (i + 1) fuel acc
     else
       let row := i / next.size.cols
       let col := i % next.size.cols
       let rowEnd := Nat.min next.cells.size ((row + 1) * next.size.cols)
       let (j, rendered) := renderChangedRun old next i rowEnd ""
-      renderDiffLoop old next j (acc ++ Ansi.moveCursor row col ++ rendered)
+      renderDiffLoopFuel old next j fuel (acc ++ Ansi.moveCursor row col ++ rendered)
+
+/-- Worker for rendering an ANSI diff from one screen to another. -/
+def renderDiffLoop (old next : Screen) (i : Nat) (acc : String) : String :=
+  renderDiffLoopFuel old next i (next.cells.size - i + 1) acc
 
 /--
 Renders the ANSI text needed to update `old` into `next`.
