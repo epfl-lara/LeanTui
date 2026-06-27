@@ -43,6 +43,11 @@ available, applies the available events to the model, checks the terminal size,
 and renders one diff frame. This keeps idle SSH sessions quiet; terminal resizes
 are picked up after the next input event rather than immediately.
 
+Apps can observe terminal output volume with the `terminalOutput` hook. LeanTui
+maintains a cumulative count of characters written by the app runner and passes
+that count into the model before each render, making it available for lightweight
+performance displays.
+
 ### chess-demo
 
 ```bash

@@ -24,8 +24,17 @@ structure Mode where
 deriving Repr
 
 /-- Writes text to standard output without adding a newline. -/
-def write (text : String) : IO Unit :=
+private def write (text : String) : IO Unit :=
   IO.print text
+
+/-- Counts the characters in text that will be sent to the terminal. -/
+def outputCharCount (text : String) : Nat :=
+  text.toList.length
+
+/-- Writes text to standard output and returns the number of characters written. -/
+def writeMeasured (text : String) : IO Nat := do
+  write text
+  pure (outputCharCount text)
 
 /-- Flushes standard output. -/
 def flush : IO Unit := do
@@ -156,10 +165,24 @@ def drawFull (screen : Screen) : IO Unit := do
   write screen.renderFull
   flush
 
+/-- Draws a full screen render and returns the number of characters written. -/
+def drawFullMeasured (screen : Screen) : IO Nat := do
+  let text := screen.renderFull
+  let count ← writeMeasured text
+  flush
+  pure count
+
 /-- Draws the ANSI diff needed to update one screen to another. -/
 def drawDiff (old next : Screen) : IO Unit := do
   write (Screen.renderDiff old next)
   flush
+
+/-- Draws a screen diff and returns the number of characters written. -/
+def drawDiffMeasured (old next : Screen) : IO Nat := do
+  let text := Screen.renderDiff old next
+  let count ← writeMeasured text
+  flush
+  pure count
 
 /-- Reads one line from standard input and decodes it as a key. -/
 def readKeyLine : IO Key := do
