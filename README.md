@@ -55,5 +55,5 @@ lake exe chess-demo
   * exit using `q` or ESC
 
 The chess demo renders pieces with Unicode chess symbols. It enforces turn order,
-ordinary piece movement, captures, and automatic queen promotion. Check,
-castling, and en passant are intentionally omitted to keep the example compact.
+ordinary piece movement, captures, castling, en passant, and automatic queen
+promotion. Check is intentionally omitted to keep the example compact.

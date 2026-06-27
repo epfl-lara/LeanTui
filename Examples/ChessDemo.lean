@@ -51,6 +51,14 @@ structure ChessModel where
   message : String := "White to move"
   moveCount : Nat := 1
   moveHistory : Array String := #[]
+  whiteKingMoved : Bool := false
+  blackKingMoved : Bool := false
+  whiteQueensideRookMoved : Bool := false
+  whiteKingsideRookMoved : Bool := false
+  blackQueensideRookMoved : Bool := false
+  blackKingsideRookMoved : Bool := false
+  enPassantTarget : Option Square := none
+  winner : Option Side := none
 
 /-- Provides a usable terminal size when the actual terminal size cannot be read. -/
 def fallbackSize : Size :=
@@ -108,6 +116,37 @@ def initialBoard : Board :=
   let board := fillPawns board Side.white 6 0
   fillHomeRow board Side.white 7 0
 
+/-- Returns the board row where a side's king and rooks begin. -/
+def homeRowIndex : Side -> Nat
+  | Side.white => 7
+  | Side.black => 0
+
+/-- Returns whether the king for a side has moved. -/
+def kingMoved (model : ChessModel) : Side -> Bool
+  | Side.white => model.whiteKingMoved
+  | Side.black => model.blackKingMoved
+
+/-- Returns whether the relevant rook for a side has moved. -/
+def rookMoved (model : ChessModel) (side : Side) (kingside : Bool) : Bool :=
+  match side, kingside with
+  | Side.white, true => model.whiteKingsideRookMoved
+  | Side.white, false => model.whiteQueensideRookMoved
+  | Side.black, true => model.blackKingsideRookMoved
+  | Side.black, false => model.blackQueensideRookMoved
+
+/-- Marks a side's king as having moved. -/
+def setKingMoved (model : ChessModel) : Side -> ChessModel
+  | Side.white => { model with whiteKingMoved := true }
+  | Side.black => { model with blackKingMoved := true }
+
+/-- Marks one of a side's rooks as having moved. -/
+def setRookMoved (model : ChessModel) (side : Side) (kingside : Bool) : ChessModel :=
+  match side, kingside with
+  | Side.white, true => { model with whiteKingsideRookMoved := true }
+  | Side.white, false => { model with whiteQueensideRookMoved := true }
+  | Side.black, true => { model with blackKingsideRookMoved := true }
+  | Side.black, false => { model with blackQueensideRookMoved := true }
+
 /-- Computes the absolute difference between two natural numbers. -/
 def absDiff (a b : Nat) : Nat :=
   if a >= b then a - b else b - a
@@ -153,28 +192,58 @@ def clearPath (board : Board) (src dst : Square) : Bool :=
     (Int.ofNat dst.row) (Int.ofNat dst.col) rowStep colStep
 
 /-- Checks pawn-specific movement, including double moves and ordinary captures. -/
-def pawnMoveLegal (board : Board) (side : Side) (src dst : Square) : Bool :=
+def pawnMoveLegal (model : ChessModel) (side : Side) (src dst : Square) : Bool :=
+  let board := model.board
   let target := boardGet board dst
+  let enPassant :=
+    target == none && absDiff src.col dst.col == 1 && model.enPassantTarget == some dst &&
+      match boardGet board { row := src.row, col := dst.col } with
+      | some piece => piece.side != side && piece.kind == PieceKind.pawn
+      | none => false
   match side with
   | Side.white =>
       let one := src.row == dst.row + 1 && src.col == dst.col && target == none
       let two := src.row == 6 && dst.row == 4 && src.col == dst.col &&
         target == none && boardGet board { row := 5, col := src.col } == none
       let capture := src.row == dst.row + 1 && absDiff src.col dst.col == 1 && target != none
-      one || two || capture
+      one || two || capture || (src.row == dst.row + 1 && enPassant)
   | Side.black =>
       let one := dst.row == src.row + 1 && src.col == dst.col && target == none
       let two := src.row == 1 && dst.row == 3 && src.col == dst.col &&
         target == none && boardGet board { row := 2, col := src.col } == none
       let capture := dst.row == src.row + 1 && absDiff src.col dst.col == 1 && target != none
-      one || two || capture
+      one || two || capture || (dst.row == src.row + 1 && enPassant)
+
+/-- Checks whether a castle move has clear path and retained castling rights. -/
+def castleMoveLegal (model : ChessModel) (piece : Piece) (src dst : Square) : Bool :=
+  let row := homeRowIndex piece.side
+  let kingside := dst.col == 6
+  let queenside := dst.col == 2
+  let rookCol := if kingside then 7 else 0
+  let rookSq := { row := row, col := rookCol }
+  let rookOk :=
+    match boardGet model.board rookSq with
+    | some rook => rook.side == piece.side && rook.kind == PieceKind.rook
+    | none => false
+  let pathOk :=
+    if kingside then
+      boardGet model.board { row := row, col := 5 } == none &&
+      boardGet model.board { row := row, col := 6 } == none
+    else
+      boardGet model.board { row := row, col := 1 } == none &&
+      boardGet model.board { row := row, col := 2 } == none &&
+      boardGet model.board { row := row, col := 3 } == none
+  piece.kind == PieceKind.king && src.row == row && src.col == 4 &&
+    dst.row == row && (kingside || queenside) &&
+    !kingMoved model piece.side && !rookMoved model piece.side kingside &&
+    rookOk && pathOk
 
 /-- Checks whether a piece may move from one square to another on the current board. -/
-def pieceMoveLegal (board : Board) (piece : Piece) (src dst : Square) : Bool :=
+def pieceMoveLegal (model : ChessModel) (piece : Piece) (src dst : Square) : Bool :=
   if src == dst then
     false
   else
-    match boardGet board dst with
+    match boardGet model.board dst with
     | some target =>
         if target.side == piece.side then
           false
@@ -185,13 +254,14 @@ where
   legalShape : Bool :=
     match piece.kind with
     | PieceKind.king => absDiff src.row dst.row <= 1 && absDiff src.col dst.col <= 1
-    | PieceKind.queen => (sameLine src dst || sameDiagonal src dst) && clearPath board src dst
-    | PieceKind.rook => sameLine src dst && clearPath board src dst
-    | PieceKind.bishop => sameDiagonal src dst && clearPath board src dst
+        || castleMoveLegal model piece src dst
+    | PieceKind.queen => (sameLine src dst || sameDiagonal src dst) && clearPath model.board src dst
+    | PieceKind.rook => sameLine src dst && clearPath model.board src dst
+    | PieceKind.bishop => sameDiagonal src dst && clearPath model.board src dst
     | PieceKind.knight =>
         (absDiff src.row dst.row == 2 && absDiff src.col dst.col == 1) ||
         (absDiff src.row dst.row == 1 && absDiff src.col dst.col == 2)
-    | PieceKind.pawn => pawnMoveLegal board piece.side src dst
+    | PieceKind.pawn => pawnMoveLegal model piece.side src dst
 
 /-- Promotes a pawn to a queen when it reaches the far row. -/
 def promoteIfNeeded (piece : Piece) (to : Square) : Piece :=
@@ -206,6 +276,76 @@ def promoteIfNeeded (piece : Piece) (to : Square) : Piece :=
 def movePiece (board : Board) (src dst : Square) (piece : Piece) : Board :=
   let board := boardSet board src none
   boardSet board dst (some (promoteIfNeeded piece dst))
+
+/-- Returns whether a move is a two-square pawn advance. -/
+def isDoublePawnMove (piece : Piece) (src dst : Square) : Bool :=
+  piece.kind == PieceKind.pawn && src.col == dst.col && absDiff src.row dst.row == 2
+
+/-- Returns the en passant target square created by a two-square pawn advance. -/
+def nextEnPassantTarget? (piece : Piece) (src dst : Square) : Option Square :=
+  if isDoublePawnMove piece src dst then
+    match piece.side with
+    | Side.white => some { row := src.row - 1, col := src.col }
+    | Side.black => some { row := src.row + 1, col := src.col }
+  else
+    none
+
+/-- Returns whether a legal king move is castling. -/
+def isCastleMove (piece : Piece) (src dst : Square) : Bool :=
+  piece.kind == PieceKind.king && src.row == dst.row && absDiff src.col dst.col == 2
+
+/-- Returns whether a legal pawn move captures en passant. -/
+def isEnPassantMove (model : ChessModel) (piece : Piece) (src dst : Square) : Bool :=
+  piece.kind == PieceKind.pawn && boardGet model.board dst == none &&
+    absDiff src.col dst.col == 1 && model.enPassantTarget == some dst
+
+/-- Applies any rook movement needed for castling. -/
+def moveCastleRook (board : Board) (side : Side) (dst : Square) : Board :=
+  let row := homeRowIndex side
+  if dst.col == 6 then
+    match boardGet board { row := row, col := 7 } with
+    | some rook =>
+        let board := boardSet board { row := row, col := 7 } none
+        boardSet board { row := row, col := 5 } (some rook)
+    | none => board
+  else if dst.col == 2 then
+    match boardGet board { row := row, col := 0 } with
+    | some rook =>
+        let board := boardSet board { row := row, col := 0 } none
+        boardSet board { row := row, col := 3 } (some rook)
+    | none => board
+  else
+    board
+
+/-- Removes the pawn captured by en passant. -/
+def removeEnPassantPawn (board : Board) (src dst : Square) : Board :=
+  boardSet board { row := src.row, col := dst.col } none
+
+/-- Updates castling rights after a king or rook move. -/
+def markCastlingRights (model : ChessModel) (piece : Piece) (src : Square) : ChessModel :=
+  match piece.kind with
+  | PieceKind.king => setKingMoved model piece.side
+  | PieceKind.rook =>
+      let row := homeRowIndex piece.side
+      if src.row == row && src.col == 0 then
+        setRookMoved model piece.side false
+      else if src.row == row && src.col == 7 then
+        setRookMoved model piece.side true
+      else
+        model
+  | _ => model
+
+/-- Applies a legal move, including castling, en passant, and move-right updates. -/
+def applyMove (model : ChessModel) (src dst : Square) (piece : Piece) : ChessModel :=
+  let enPassant := isEnPassantMove model piece src dst
+  let castle := isCastleMove piece src dst
+  let board := if enPassant then removeEnPassantPawn model.board src dst else model.board
+  let board := movePiece board src dst piece
+  let board := if castle then moveCastleRook board piece.side dst else board
+  let model := { model with board := board }
+  let model := markCastlingRights model piece src
+  let model := if castle then setRookMoved model piece.side (dst.col == 6) else model
+  { model with enPassantTarget := nextEnPassantTarget? piece src dst }
 
 /-- Chooses the Unicode chess glyph for a piece. -/
 def pieceGlyph : Piece -> Char
@@ -333,6 +473,9 @@ partial def putWrapped
 
 /-- Selects a piece or attempts to move the selected piece to the cursor square. -/
 def selectSquare (model : ChessModel) : ChessModel :=
+  match model.winner with
+  | some winner => { model with message := winner.name ++ " wins" }
+  | none =>
   match model.selected with
   | none =>
       match boardGet model.board model.cursor with
@@ -350,14 +493,23 @@ def selectSquare (model : ChessModel) : ChessModel :=
         match boardGet model.board src with
         | none => { model with selected := none, message := "Selection cleared" }
         | some piece =>
-            if pieceMoveLegal model.board piece src model.cursor then
+            if pieceMoveLegal model piece src model.cursor then
               let nextTurn := model.turn.other
-              let message := pieceName piece ++ " " ++ squareName src ++ " to " ++
-                squareName model.cursor ++ "; " ++ nextTurn.name ++ " turn"
-              let model := { model with board := movePiece model.board src model.cursor piece }
+              let captured := boardGet model.board model.cursor
+              let won :=
+                match captured with
+                | some target => target.kind == PieceKind.king
+                | none => false
+              let message :=
+                if won then
+                  piece.side.name ++ " wins"
+                else
+                  pieceName piece ++ " " ++ squareName src ++ " to " ++
+                    squareName model.cursor ++ "; " ++ nextTurn.name ++ " turn"
+              let model := applyMove model src model.cursor piece
               let model := { model with moveHistory := model.moveHistory.push (moveEntry piece model.cursor) }
               let model := { model with selected := none }
-              let model := { model with turn := nextTurn }
+              let model := if won then { model with winner := some piece.side } else { model with turn := nextTurn }
               let model := { model with moveCount := model.moveCount + 1 }
               { model with message := message }
             else
@@ -385,17 +537,22 @@ def updateChess (key : Key) (model : ChessModel) : Step ChessModel :=
   | Key.escape | Key.char 'q' => Step.quit { model with message := "Goodbye." }
   | Key.ctrl 'l' => Step.redrawFull model
   | Key.char 'r' => Step.redrawFull { initModel model.size with message := "Board reset" }
-  | Key.left => Step.continue (moveCursor 0 (-1) model)
-  | Key.right => Step.continue (moveCursor 0 1 model)
-  | Key.up => Step.continue (moveCursor (-1) 0 model)
-  | Key.down => Step.continue (moveCursor 1 0 model)
-  | Key.enter | Key.char ' ' =>
-      let next := selectSquare model
-      if next.moveCount == model.moveCount then
-        Step.continue next
-      else
-        Step.redrawFull next
-  | _ => Step.continue model
+  | _ =>
+      match model.winner with
+      | some winner => Step.continue { model with message := winner.name ++ " wins" }
+      | none =>
+          match key with
+          | Key.left => Step.continue (moveCursor 0 (-1) model)
+          | Key.right => Step.continue (moveCursor 0 1 model)
+          | Key.up => Step.continue (moveCursor (-1) 0 model)
+          | Key.down => Step.continue (moveCursor 1 0 model)
+          | Key.enter | Key.char ' ' =>
+              let next := selectSquare model
+              if next.moveCount == model.moveCount then
+                Step.continue next
+              else
+                Step.redrawFull next
+          | _ => Step.continue model
 where
   /-- Builds a fresh model used by the reset key. -/
   initModel (size : Size) : ChessModel :=
@@ -468,9 +625,12 @@ def renderChess (model : ChessModel) : Screen :=
   let screen := Screen.blank model.size
   let width := model.size.cols
   let currentLine :=
-    match selectedEntry? model with
-    | some selected => model.turn.name ++ " moves " ++ selected
-    | none => model.turn.name ++ " moves"
+    match model.winner with
+    | some winner => winner.name ++ " wins"
+    | none =>
+        match selectedEntry? model with
+        | some selected => model.turn.name ++ " moves " ++ selected
+        | none => model.turn.name ++ " moves"
   let screen := screen.putString 0 0 "Chess Demo" titleStyle
   let (screen, _) := putWrapped screen 1 0 width "Use arrows, Enter, ESC."
     Style.plain
