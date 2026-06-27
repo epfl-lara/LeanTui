@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Build LeanTui and demos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Lean toolchain
+        run: |
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Show Lean and Lake versions
+        run: |
+          lean --version
+          lake --version
+
+      - name: Build library
+        run: lake build LeanTui
+
+      - name: Build screen edit demo
+        run: lake build screen-edit-demo
+
+      - name: Build chess demo
+        run: lake build chess-demo
