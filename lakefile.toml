@@ -7,8 +7,8 @@ name = "LeanTui"
 
 [[lean_exe]]
 name = "screen-edit-demo"
-root = "Examples.ScreenEditDemo"
+root = "Demo.ScreenEdit.ScreenEditDemo"
 
 [[lean_exe]]
 name = "chess-demo"
-root = "Examples.ChessDemo"
+root = "Demo.Chess.ChessDemo"
