@@ -58,3 +58,38 @@ lake exe chess-demo
 The chess demo renders pieces with Unicode chess symbols. It enforces turn order,
 ordinary piece movement, captures, castling, en passant, and automatic queen
 promotion. Check is intentionally omitted to keep the example compact.
+
+## SSH and remote terminals
+
+LeanTui is expected to work over SSH when the remote process has an allocated
+pseudo-terminal and the local terminal understands common ANSI/xterm escape
+sequences. Prefer running interactive demos through `ssh -t`, for example:
+
+```bash
+ssh -t host 'cd /path/to/leanedit && lake exe chess-demo'
+```
+
+The library currently assumes:
+
+  * `stty` is available on the remote host for raw mode and terminal size
+    detection
+  * the remote session has a real TTY, not plain piped stdin/stdout
+  * the local terminal supports ANSI cursor movement, alternate screen mode, and
+    UTF-8 text
+  * mouse input, when used, is passed through by the local terminal and SSH
+    client as SGR mouse escape sequences
+
+Known remedies for less capable SSH setups:
+
+  * use `ssh -t` or configure the SSH client to allocate a TTY
+  * use a UTF-8 locale such as `LANG=en_US.UTF-8`
+  * disable mouse-dependent interactions and keep keyboard controls available
+  * fall back to `Terminal.readKeyLine` or a custom `readKey?` reader in
+    environments where raw input is not available
+  * avoid `$TERM=dumb`; use a terminal type compatible with xterm-style ANSI
+    controls when possible
+
+Future hardening work should make these assumptions more explicit at runtime:
+detect raw-mode or size-detection failures, reduce repeated `stty size` polling,
+add true UTF-8 input decoding, and recognize more terminal-specific key escape
+variants.
