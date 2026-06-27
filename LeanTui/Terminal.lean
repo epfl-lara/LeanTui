@@ -34,7 +34,7 @@ def outputCharCount (text : String) : Nat :=
 /-- Writes text to standard output and returns the number of characters written. -/
 def writeMeasured (text : String) : IO Nat := do
   write text
-  pure (outputCharCount text)
+  pure text.length
 
 /-- Flushes standard output. -/
 def flush : IO Unit := do
@@ -42,7 +42,13 @@ def flush : IO Unit := do
 
 /-- Removes carriage-return and newline characters from a string. -/
 def stripLineEnd (text : String) : String :=
-  String.ofList (text.toList.filter (fun ch => ch != '\n' && ch != '\r'))
+  text.foldl
+    (fun acc ch =>
+      if ch == '\n' || ch == '\r' then
+        acc
+      else
+        acc.push ch)
+    ""
 
 /-- Adds the correct target flags to a `stty` argument list. -/
 def sttyArgs (target : SttyTarget) (args : Array String) : Array String :=

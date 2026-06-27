@@ -77,24 +77,26 @@ def set (screen : Screen) (pos : Pos) (cell : Cell) : Screen :=
 def putChar (screen : Screen) (row col : Nat) (ch : Char) (style : Style := Style.plain) : Screen :=
   screen.set { row := row, col := col } { ch := ch, style := style }
 
-/-- Worker for writing a list of characters across a row. -/
-def putStringLoop (screen : Screen) (row col : Nat) (chars : List Char) (style : Style) : Screen :=
-  match chars with
-  | [] => screen
-  | ch :: rest =>
-      putStringLoop (screen.putChar row col ch style) row (col + 1) rest style
-
 /-- Writes a string starting at a zero-based row and column. -/
 def putString (screen : Screen) (row col : Nat) (text : String) (style : Style := Style.plain) : Screen :=
-  putStringLoop screen row col text.toList style
+  (text.foldl
+    (fun (state : Screen × Nat) ch =>
+      let (screen, col) := state
+      (screen.putChar row col ch style, col + 1))
+    (screen, col)).fst
 
 /-- Worker for writing multiple strings in consecutive rows. -/
 def putStringsLoop
-    (screen : Screen) (row col : Nat) (lines : List String) (style : Style) : Screen :=
-  match lines with
-  | [] => screen
-  | line :: rest =>
-      putStringsLoop (screen.putString row col line style) (row + 1) col rest style
+    (screen : Screen) (row col index fuel : Nat) (lines : Array String) (style : Style) : Screen :=
+  match fuel with
+  | 0 => screen
+  | fuel + 1 =>
+      if index >= lines.size then
+        screen
+      else
+        let line := lines.getD index ""
+        let screen := screen.putString (row + index) col line style
+        putStringsLoop screen row col (index + 1) fuel lines style
 
 /--
 Writes strings into consecutive rows starting at a zero-based top-left corner.
@@ -102,27 +104,34 @@ Writes strings into consecutive rows starting at a zero-based top-left corner.
 -/
 def putStrings
     (screen : Screen) (row col : Nat) (lines : Array String) (style : Style := Style.plain) : Screen :=
-  putStringsLoop screen row col lines.toList style
+  putStringsLoop screen row col 0 (lines.size + 1) lines style
 
 /-- Worker for rendering columns in one row into ANSI text. -/
-def renderFullCols (screen : Screen) (row : Nat) (cols : List Nat) (line : String) : String :=
-  match cols with
-  | [] => line
-  | col :: rest =>
-      renderFullCols screen row rest (line ++ (screen.get { row := row, col := col }).render)
+def renderFullCols (screen : Screen) (row col fuel : Nat) (line : String) : String :=
+  match fuel with
+  | 0 => line
+  | fuel + 1 =>
+      if col >= screen.size.cols then
+        line
+      else
+        renderFullCols screen row (col + 1) fuel
+          (line ++ (screen.get { row := row, col := col }).render)
 
 /-- Worker for rendering every row of a screen into ANSI text. -/
-def renderFullRows (screen : Screen) (rows : List Nat) (acc : String) : String :=
-  match rows with
-  | [] => acc
-  | row :: rest =>
-      let lineStart := Ansi.moveCursor row 0
-      let line := renderFullCols screen row (List.range screen.size.cols) ""
-      renderFullRows screen rest (acc ++ lineStart ++ line)
+def renderFullRows (screen : Screen) (row fuel : Nat) (acc : String) : String :=
+  match fuel with
+  | 0 => acc
+  | fuel + 1 =>
+      if row >= screen.size.rows then
+        acc
+      else
+        let lineStart := Ansi.moveCursor row 0
+        let line := renderFullCols screen row 0 (screen.size.cols + 1) ""
+        renderFullRows screen (row + 1) fuel (acc ++ lineStart ++ line)
 
 /-- Renders the entire screen as ANSI text, including cursor hide and clear commands. -/
 def renderFull (screen : Screen) : String :=
-  Ansi.hideCursor ++ Ansi.clearScreen ++ renderFullRows screen (List.range screen.size.rows) "" ++
+  Ansi.hideCursor ++ Ansi.clearScreen ++ renderFullRows screen 0 (screen.size.rows + 1) "" ++
     Ansi.reset
 
 /-- Worker for rendering a contiguous run of changed cells sharing one style. -/
