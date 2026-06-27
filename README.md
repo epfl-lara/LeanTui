@@ -79,6 +79,12 @@ The library currently assumes:
   * mouse input, when used, is passed through by the local terminal and SSH
     client as SGR mouse escape sequences
 
+LeanTui tries both BSD/macOS (`stty -f /dev/tty`) and GNU/Linux
+(`stty -F /dev/tty`) forms before falling back to inherited stdin. Terminal
+resize checks are throttled instead of running every frame, which keeps SSH
+sessions from spawning `stty size` excessively while still redrawing after a
+resize.
+
 Known remedies for less capable SSH setups:
 
   * use `ssh -t` or configure the SSH client to allocate a TTY
@@ -90,6 +96,5 @@ Known remedies for less capable SSH setups:
     controls when possible
 
 Future hardening work should make these assumptions more explicit at runtime:
-detect raw-mode or size-detection failures, reduce repeated `stty size` polling,
-add true UTF-8 input decoding, and recognize more terminal-specific key escape
-variants.
+detect raw-mode or size-detection failures, add true UTF-8 input decoding, and
+recognize more terminal-specific key escape variants.

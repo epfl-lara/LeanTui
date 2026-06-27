@@ -7,8 +7,10 @@ namespace Terminal
 
 /-- Which terminal file descriptor `stty` commands should target. -/
 inductive SttyTarget where
-  /-- Use `/dev/tty`, the process controlling terminal. -/
-  | controllingTerminal
+  /-- Use `/dev/tty` with BSD/macOS `stty -f`. -/
+  | controllingTerminalBsd
+  /-- Use `/dev/tty` with GNU/Linux `stty -F`. -/
+  | controllingTerminalGnu
   /-- Use the process inherited standard input. -/
   | inheritedStdin
 deriving BEq, Repr
@@ -36,21 +38,44 @@ def stripLineEnd (text : String) : String :=
 /-- Adds the correct target flags to a `stty` argument list. -/
 def sttyArgs (target : SttyTarget) (args : Array String) : Array String :=
   match target with
-  | SttyTarget.controllingTerminal => #["-f", "/dev/tty"] ++ args
+  | SttyTarget.controllingTerminalBsd => #["-f", "/dev/tty"] ++ args
+  | SttyTarget.controllingTerminalGnu => #["-F", "/dev/tty"] ++ args
   | SttyTarget.inheritedStdin => args
 
 /-- Runs `stty` for a target and ignores its output. -/
 def runSttyOn (target : SttyTarget) (args : Array String) : IO Unit := do
-  let _ ← IO.Process.output { cmd := "stty", args := sttyArgs target args }
-  pure ()
+  let output ← IO.Process.output { cmd := "stty", args := sttyArgs target args }
+  if output.exitCode == 0 then
+    pure ()
+  else
+    throw (IO.userError output.stderr)
 
 /-- Runs `stty` for a target and returns captured output on success. -/
 def runSttyCaptureOn (target : SttyTarget) (args : Array String) : IO (Option String) := do
   try
-    let output ← IO.Process.run { cmd := "stty", args := sttyArgs target args }
-    pure (some output)
+    let output ← IO.Process.output { cmd := "stty", args := sttyArgs target args }
+    if output.exitCode == 0 then
+      pure (some output.stdout)
+    else
+      pure none
   catch _ =>
     pure none
+
+/-- Targets to try when asking `stty` about the active terminal. -/
+def sttyTargets : List SttyTarget :=
+  [ SttyTarget.controllingTerminalBsd
+  , SttyTarget.controllingTerminalGnu
+  , SttyTarget.inheritedStdin
+  ]
+
+/-- Tries an `stty` operation on targets until one succeeds. -/
+partial def firstStty? {α : Type} (op : SttyTarget -> IO (Option α)) : List SttyTarget ->
+    IO (Option α)
+  | [] => pure none
+  | target :: rest => do
+      match (← op target) with
+      | some value => pure (some value)
+      | none => firstStty? op rest
 
 /-- Parses `stty size` output into a nonzero terminal size. -/
 def parseSize (text : String) : Option Size :=
@@ -71,12 +96,10 @@ def sizeOn? (target : SttyTarget) : IO (Option Size) := do
 
 /--
 Reads the current terminal size.
-Tries the controlling terminal first, then inherited standard input.
+Tries BSD/macOS `/dev/tty`, GNU/Linux `/dev/tty`, then inherited standard input.
 -/
 def size? : IO (Option Size) := do
-  match (← sizeOn? SttyTarget.controllingTerminal) with
-  | some size => pure (some size)
-  | none => sizeOn? SttyTarget.inheritedStdin
+  firstStty? sizeOn? sttyTargets
 
 /-- Captures the current terminal mode for one `stty` target. -/
 def captureModeOn (target : SttyTarget) : IO (Option Mode) := do
@@ -88,12 +111,10 @@ def captureModeOn (target : SttyTarget) : IO (Option Mode) := do
 
 /--
 Captures the current terminal mode.
-Tries the controlling terminal first, then inherited standard input.
+Tries BSD/macOS `/dev/tty`, GNU/Linux `/dev/tty`, then inherited standard input.
 -/
 def captureMode : IO (Option Mode) := do
-  match (← captureModeOn SttyTarget.controllingTerminal) with
-  | some mode => pure (some mode)
-  | none => captureModeOn SttyTarget.inheritedStdin
+  firstStty? captureModeOn sttyTargets
 
 /--
 Enables raw, non-echoing terminal input and returns the previous mode.
