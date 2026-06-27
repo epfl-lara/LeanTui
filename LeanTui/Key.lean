@@ -1,5 +1,17 @@
 namespace LeanTui
 
+/-- A decoded terminal mouse event position and button payload. -/
+structure MouseEvent where
+  /-- Zero-based terminal row. -/
+  row : Nat
+  /-- Zero-based terminal column. -/
+  col : Nat
+  /-- Raw terminal mouse button/modifier code. -/
+  button : Nat
+  /-- Whether this event is a button press rather than a release. -/
+  pressed : Bool
+deriving BEq, Repr
+
 /-- A decoded terminal key press. -/
 inductive Key where
   /-- A printable character key. -/
@@ -28,6 +40,8 @@ inductive Key where
   | endKey
   /-- Forward delete key. -/
   | delete
+  /-- A mouse event decoded from an SGR mouse escape sequence. -/
+  | mouse (event : MouseEvent)
   /-- An unrecognized escape sequence or byte sequence. -/
   | unknown (bytes : String)
 deriving BEq, Repr

@@ -156,6 +156,61 @@ inductive ParseResult where
   /-- The buffer may become a key after more input arrives. -/
   | incomplete
 
+/-- Result of scanning an SGR mouse escape sequence. -/
+inductive SgrMouseScan where
+  /-- A complete payload, final event character, and remaining input. -/
+  | complete (payload : List Char) (final : Char) (rest : List Char)
+  /-- More input is needed before the mouse sequence can be decoded. -/
+  | incomplete
+  /-- The bytes are not a valid SGR mouse sequence. -/
+  | invalid
+deriving Nonempty
+
+/-- Scans characters after `ESC [ <` until the SGR mouse final byte. -/
+partial def scanSgrMouse (payload : List Char) : List Char -> SgrMouseScan
+  | [] => SgrMouseScan.incomplete
+  | 'M' :: rest => SgrMouseScan.complete payload.reverse 'M' rest
+  | 'm' :: rest => SgrMouseScan.complete payload.reverse 'm' rest
+  | ch :: rest =>
+      if ch.isDigit || ch == ';' then
+        scanSgrMouse (ch :: payload) rest
+      else
+        SgrMouseScan.invalid
+
+/-- Parses an unsigned natural number from a list of decimal digits. -/
+partial def parseDigitsNat? (chars : List Char) : Option Nat :=
+  match chars with
+  | [] => none
+  | _ =>
+      if chars.all Char.isDigit then
+        String.toNat? (String.ofList chars)
+      else
+        none
+
+/-- Splits a list of characters on semicolon separators. -/
+partial def splitSemicolonLoop (current : List Char) (parts : List (List Char)) : List Char ->
+    List (List Char)
+  | [] => (current.reverse :: parts).reverse
+  | ';' :: rest => splitSemicolonLoop [] (current.reverse :: parts) rest
+  | ch :: rest => splitSemicolonLoop (ch :: current) parts rest
+
+/-- Splits a list of characters on semicolon separators. -/
+def splitSemicolon (chars : List Char) : List (List Char) :=
+  splitSemicolonLoop [] [] chars
+
+/-- Decodes an SGR mouse payload into a LeanTui mouse event. -/
+def decodeSgrMouse? (payload : List Char) (final : Char) : Option MouseEvent :=
+  match splitSemicolon payload with
+  | [buttonChars, colChars, rowChars] =>
+      match parseDigitsNat? buttonChars, parseDigitsNat? colChars, parseDigitsNat? rowChars with
+      | some button, some col, some row =>
+          if row == 0 || col == 0 then
+            none
+          else
+            some { row := row - 1, col := col - 1, button := button, pressed := final == 'M' }
+      | _, _, _ => none
+  | _ => none
+
 /-- Returns whether a character byte represents backspace. -/
 def isBackspaceByte (ch : Char) : Bool :=
   ch == '\x7f' || ch == '\x08'
@@ -178,6 +233,15 @@ def parseOne : List Char -> ParseResult
   | [] => ParseResult.incomplete
   | ['\x1b'] => ParseResult.incomplete
   | '\x1b' :: '[' :: [] => ParseResult.incomplete
+  | '\x1b' :: '[' :: '<' :: rest =>
+      match scanSgrMouse [] rest with
+      | SgrMouseScan.incomplete => ParseResult.incomplete
+      | SgrMouseScan.invalid =>
+          ParseResult.key (Key.unknown (String.ofList ['\x1b', '[', '<'])) rest
+      | SgrMouseScan.complete payload final rest =>
+          match decodeSgrMouse? payload final with
+          | some event => ParseResult.key (Key.mouse event) rest
+          | none => ParseResult.key (Key.unknown (String.ofList (['\x1b', '[', '<'] ++ payload ++ [final]))) rest
   | '\x1b' :: '[' :: '3' :: [] => ParseResult.incomplete
   | '\x1b' :: '[' :: 'A' :: rest => ParseResult.key Key.up rest
   | '\x1b' :: '[' :: 'B' :: rest => ParseResult.key Key.down rest

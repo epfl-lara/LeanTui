@@ -531,6 +531,21 @@ def moveCursor (dRow dCol : Int) (model : ChessModel) : ChessModel :=
   let col := clampTo 8 ((Int.ofNat model.cursor.col + dCol).toNat)
   { model with cursor := { row := row, col := col } }
 
+/-- Converts a terminal mouse event over the rendered board into a chess square. -/
+def mouseSquare? (event : MouseEvent) : Option Square :=
+  if !event.pressed then
+    none
+  else if event.row < 3 || event.row >= 11 || event.col < 2 || event.col >= 26 then
+    none
+  else
+    some { row := event.row - 3, col := (event.col - 2) / 3 }
+
+/-- Applies a mouse click as moving the cursor and pressing Enter on a board square. -/
+def clickSquare (event : MouseEvent) (model : ChessModel) : ChessModel :=
+  match mouseSquare? event with
+  | none => model
+  | some sq => selectSquare { model with cursor := sq }
+
 /-- Handles one key press and returns the app-loop step for the chess demo. -/
 def updateChess (key : Key) (model : ChessModel) : Step ChessModel :=
   match key with
@@ -546,6 +561,12 @@ def updateChess (key : Key) (model : ChessModel) : Step ChessModel :=
           | Key.right => Step.continue (moveCursor 0 1 model)
           | Key.up => Step.continue (moveCursor (-1) 0 model)
           | Key.down => Step.continue (moveCursor 1 0 model)
+          | Key.mouse event =>
+              let next := clickSquare event model
+              if next.moveCount == model.moveCount then
+                Step.continue next
+              else
+                Step.redrawFull next
           | Key.enter | Key.char ' ' =>
               let next := selectSquare model
               if next.moveCount == model.moveCount then
@@ -632,7 +653,7 @@ def renderChess (model : ChessModel) : Screen :=
         | some selected => model.turn.name ++ " moves " ++ selected
         | none => model.turn.name ++ " moves"
   let screen := screen.putString 0 0 "Chess Demo" titleStyle
-  let (screen, _) := putWrapped screen 1 0 width "Use arrows, Enter, ESC."
+  let (screen, _) := putWrapped screen 1 0 width "Click, arrows, Enter, ESC."
     Style.plain
   let screen := renderBoard screen model 0
   let screen := renderColumns screen 0
@@ -652,7 +673,8 @@ def initModel (size : Size) : ChessModel :=
 def chessApp (size : Size) : App ChessModel :=
   { init := initModel size
     view := renderChess
-    update := updateChess }
+    update := updateChess
+    mouse := true }
 
 /-- Entry point that detects terminal size and runs the chess demo. -/
 def main (_args : List String) : IO Unit := do

@@ -23,6 +23,8 @@ structure App (Model : Type) where
   readKey? : Option (IO Key) := none
   /-- Delay between frames in milliseconds. -/
   frameDelayMs : UInt32 := 16
+  /-- Whether the app wants terminal mouse press/release events. -/
+  mouse : Bool := false
 
 namespace App
 
@@ -105,6 +107,9 @@ def run (app : App Model) : IO Unit := do
   let reader ← Terminal.mkInputReader
   Terminal.enter
   try
+    if app.mouse then
+      Terminal.write (Ansi.enableMouseTracking ++ Ansi.enableSgrMouse)
+      Terminal.flush
     let initial := app.view app.init
     Terminal.drawFull initial
     waitFrame app
@@ -112,6 +117,9 @@ def run (app : App Model) : IO Unit := do
     | some readKey => loopWithReadKey app readKey initial app.init
     | none => loopWithReader app reader initial app.init
   finally
+    if app.mouse then
+      Terminal.write (Ansi.disableMouseTracking ++ Ansi.disableSgrMouse)
+      Terminal.flush
     Terminal.leave
     Terminal.restore mode?
 

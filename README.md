@@ -50,6 +50,7 @@ lake exe chess-demo
 ```
 
   * move the cursor with arrow keys
+  * click a board square in terminals that support SGR mouse reporting
   * select and place pieces with Enter or Space
   * reset the board with `r`
   * exit using `q` or ESC

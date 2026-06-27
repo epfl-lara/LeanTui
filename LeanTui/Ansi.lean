@@ -33,6 +33,22 @@ def enterAlternateScreen : String :=
 def leaveAlternateScreen : String :=
   csi "?1049l"
 
+/-- ANSI sequence that enables basic mouse press reporting. -/
+def enableMouseTracking : String :=
+  csi "?1000h"
+
+/-- ANSI sequence that disables basic mouse press reporting. -/
+def disableMouseTracking : String :=
+  csi "?1000l"
+
+/-- ANSI sequence that enables SGR mouse coordinate encoding. -/
+def enableSgrMouse : String :=
+  csi "?1006h"
+
+/-- ANSI sequence that disables SGR mouse coordinate encoding. -/
+def disableSgrMouse : String :=
+  csi "?1006l"
+
 /-- ANSI sequence that resets text style and colors. -/
 def reset : String :=
   csi "0m"
