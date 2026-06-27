@@ -42,3 +42,18 @@ The app loop is frame-driven. It polls raw input without blocking, applies all
 currently available key events to the model, renders one diff frame, and then
 sleeps until the next frame. Set `frameDelayMs := 0` on an app to disable frame
 pacing.
+
+### chess-demo
+
+```bash
+lake exe chess-demo
+```
+
+  * move the cursor with arrow keys
+  * select and place pieces with Enter or Space
+  * reset the board with `r`
+  * exit using `q` or ESC
+
+The chess demo renders pieces with Unicode chess symbols. It enforces turn order,
+ordinary piece movement, captures, and automatic queen promotion. Check,
+castling, and en passant are intentionally omitted to keep the example compact.
