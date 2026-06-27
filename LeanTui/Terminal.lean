@@ -322,8 +322,16 @@ partial def readKey (reader : InputReader) : IO Key := do
   match (← reader.pollKeys) with
   | key :: _ => pure key
   | [] =>
-      IO.sleep 1
+      IO.sleep 16
       readKey reader
+
+/-- Waits until at least one key is available and returns the full available batch. -/
+partial def readKeys (reader : InputReader) : IO (List Key) := do
+  match (← reader.pollKeys) with
+  | [] =>
+      IO.sleep 16
+      readKeys reader
+  | keys => pure keys
 
 end InputReader
 

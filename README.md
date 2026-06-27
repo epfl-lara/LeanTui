@@ -36,12 +36,12 @@ where raw terminal input is not desirable.
 
 Raw input is parsed through a small buffered reader. If the terminal delivers
 several cursor-key escape sequences in one read, as can happen with key repeat,
-the reader consumes one key and keeps the remaining bytes for subsequent events.
+the reader decodes the available batch before the app renders the next frame.
 
-The app loop is frame-driven. It polls raw input without blocking, applies all
-currently available key events to the model, renders one diff frame, and then
-sleeps until the next frame. Set `frameDelayMs := 0` on an app to disable frame
-pacing.
+The app loop is input-driven. It waits until a keyboard or mouse event is
+available, applies the available events to the model, checks the terminal size,
+and renders one diff frame. This keeps idle SSH sessions quiet; terminal resizes
+are picked up after the next input event rather than immediately.
 
 ### chess-demo
 
@@ -81,9 +81,8 @@ The library currently assumes:
 
 LeanTui tries both BSD/macOS (`stty -f /dev/tty`) and GNU/Linux
 (`stty -F /dev/tty`) forms before falling back to inherited stdin. Terminal
-resize checks are throttled instead of running every frame, which keeps SSH
-sessions from spawning `stty size` excessively while still redrawing after a
-resize.
+resize checks run after input events instead of on an idle timer, which keeps SSH
+sessions from spawning `stty size` while nothing is happening.
 
 Known remedies for less capable SSH setups:
 

@@ -23,10 +23,6 @@ structure App (Model : Type) where
   resize : Size -> Model -> Model := fun _ model => model
   /-- Optional blocking key reader, useful for tests or custom input. -/
   readKey? : Option (IO Key) := none
-  /-- Delay between frames in milliseconds. -/
-  frameDelayMs : UInt32 := 16
-  /-- Number of rendered frames between terminal-size polls. -/
-  resizePollFrames : Nat := 16
   /-- Whether the app wants terminal mouse press/release events. -/
   mouse : Bool := false
 
@@ -40,13 +36,6 @@ structure FrameState (Model : Type) where
   redrawFull : Bool := false
   /-- Whether the app should stop after this frame. -/
   quit : Bool := false
-
-/-- Sleeps for `app.frameDelayMs`, unless the delay is zero. -/
-def waitFrame (app : App Model) : IO Unit := do
-  if app.frameDelayMs == 0 then
-    pure ()
-  else
-    IO.sleep app.frameDelayMs
 
 /-- Applies a batch of keys to frame state in order. -/
 partial def applyKeys (app : App Model) (state : FrameState Model) : List Key -> FrameState Model
@@ -70,66 +59,50 @@ def drawFrame (redrawFull : Bool) (previous next : Screen) : IO Unit := do
   else
     Terminal.drawDiff previous next
 
-/-- Returns the next resize-poll countdown after one frame. -/
-def nextResizeCountdown (app : App Model) : Nat :=
-  if app.resizePollFrames == 0 then
-    0
-  else
-    app.resizePollFrames - 1
-
-/-- Applies an app resize hook when the throttled size poll detects a changed terminal. -/
+/-- Applies an app resize hook when a post-input size poll detects a changed terminal. -/
 def applyResize
     (app : App Model)
     (previous : Screen)
-    (state : FrameState Model)
-    (resizeCountdown : Nat) : IO (FrameState Model × Nat) := do
-  if resizeCountdown > 0 then
-    pure (state, resizeCountdown - 1)
-  else
-    match (← Terminal.size?) with
-    | none => pure (state, nextResizeCountdown app)
-    | some size =>
-        if size == previous.size then
-          pure (state, nextResizeCountdown app)
-        else
-          pure ({ state with model := app.resize size state.model, redrawFull := true },
-            nextResizeCountdown app)
+    (state : FrameState Model) : IO (FrameState Model) := do
+  match (← Terminal.size?) with
+  | none => pure state
+  | some size =>
+      if size == previous.size then
+        pure state
+      else
+        pure { state with model := app.resize size state.model, redrawFull := true }
 
-/-- Runs the app loop using nonblocking raw input polling. -/
+/-- Runs the app loop by waiting for input, then rendering one resulting frame. -/
 partial def loopWithReader
     (app : App Model)
     (reader : Terminal.InputReader)
     (previous : Screen)
-    (model : Model)
-    (resizeCountdown : Nat) : IO Unit := do
-  let keys ← reader.pollKeys
+    (model : Model) : IO Unit := do
+  let keys ← reader.readKeys
   let state := applyKeys app { model := model } keys
-  let (state, resizeCountdown) ← applyResize app previous state resizeCountdown
+  let state ← applyResize app previous state
   let next := app.view state.model
   drawFrame state.redrawFull previous next
   if state.quit then
     pure ()
   else
-    waitFrame app
-    loopWithReader app reader next state.model resizeCountdown
+    loopWithReader app reader next state.model
 
 /-- Runs the app loop using a caller-provided blocking key reader. -/
 partial def loopWithReadKey
     (app : App Model)
     (readKey : IO Key)
     (previous : Screen)
-    (model : Model)
-    (resizeCountdown : Nat) : IO Unit := do
+    (model : Model) : IO Unit := do
   let key ← readKey
   let state := applyKeys app { model := model } [key]
-  let (state, resizeCountdown) ← applyResize app previous state resizeCountdown
+  let state ← applyResize app previous state
   let next := app.view state.model
   drawFrame state.redrawFull previous next
   if state.quit then
     pure ()
   else
-    waitFrame app
-    loopWithReadKey app readKey next state.model resizeCountdown
+    loopWithReadKey app readKey next state.model
 
 /--
 Runs an application in the alternate screen.
@@ -145,10 +118,9 @@ def run (app : App Model) : IO Unit := do
       Terminal.flush
     let initial := app.view app.init
     Terminal.drawFull initial
-    waitFrame app
     match app.readKey? with
-    | some readKey => loopWithReadKey app readKey initial app.init (nextResizeCountdown app)
-    | none => loopWithReader app reader initial app.init (nextResizeCountdown app)
+    | some readKey => loopWithReadKey app readKey initial app.init
+    | none => loopWithReader app reader initial app.init
   finally
     if app.mouse then
       Terminal.write (Ansi.disableMouseTracking ++ Ansi.disableSgrMouse)
