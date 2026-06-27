@@ -674,6 +674,7 @@ def chessApp (size : Size) : App ChessModel :=
   { init := initModel size
     view := renderChess
     update := updateChess
+    resize := fun size model => { model with size := size }
     mouse := true }
 
 /-- Entry point that detects terminal size and runs the chess demo. -/

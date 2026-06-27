@@ -19,6 +19,8 @@ structure App (Model : Type) where
   view : Model -> Screen
   /-- Updates the model in response to one key. -/
   update : Key -> Model -> Step Model
+  /-- Updates the model in response to a terminal resize. -/
+  resize : Size -> Model -> Model := fun _ model => model
   /-- Optional blocking key reader, useful for tests or custom input. -/
   readKey? : Option (IO Key) := none
   /-- Delay between frames in milliseconds. -/
@@ -66,6 +68,17 @@ def drawFrame (redrawFull : Bool) (previous next : Screen) : IO Unit := do
   else
     Terminal.drawDiff previous next
 
+/-- Applies an app resize hook when the terminal size changed since the previous frame. -/
+def applyResize (app : App Model) (previous : Screen) (state : FrameState Model) :
+    IO (FrameState Model) := do
+  match (← Terminal.size?) with
+  | none => pure state
+  | some size =>
+      if size == previous.size then
+        pure state
+      else
+        pure { state with model := app.resize size state.model, redrawFull := true }
+
 /-- Runs the app loop using nonblocking raw input polling. -/
 partial def loopWithReader
     (app : App Model)
@@ -74,6 +87,7 @@ partial def loopWithReader
     (model : Model) : IO Unit := do
   let keys ← reader.pollKeys
   let state := applyKeys app { model := model } keys
+  let state ← applyResize app previous state
   let next := app.view state.model
   drawFrame state.redrawFull previous next
   if state.quit then
@@ -90,6 +104,7 @@ partial def loopWithReadKey
     (model : Model) : IO Unit := do
   let key ← readKey
   let state := applyKeys app { model := model } [key]
+  let state ← applyResize app previous state
   let next := app.view state.model
   drawFrame state.redrawFull previous next
   if state.quit then
