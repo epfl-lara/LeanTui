@@ -16,59 +16,52 @@ standard `IO` facilities and writes strings to the terminal.
 - `LeanTui.Terminal`: terminal IO helpers.
 - `LeanTui.App`: a simple `init`/`view`/`update` event loop.
 
-## Demos
+## Terminal Behavior
 
-### screen-edit-demo
-
-```bash
-lake exe screen-edit-demo README.md
-```
-
-  * move with cursor keys
-  * edit screen content
-  * exit using ESC key
-
-The demo enters the terminal's alternate screen and tries to switch the
-controlling terminal into raw no-echo mode with `stty -f /dev/tty` on macOS,
-falling back to plain `stty`. Cursor keys and `q` should be read as single-key
-commands. `Terminal.readKeyLine` is also available for tests or environments
-where raw terminal input is not desirable.
-
-Raw input is parsed through a small buffered reader. If the terminal delivers
-several cursor-key escape sequences in one read, as can happen with key repeat,
-the reader decodes the available batch before the app renders the next frame.
+LeanTui apps enter the terminal's alternate screen and try to switch the
+controlling terminal into raw no-echo mode. Raw input is parsed through a small
+buffered reader. If the terminal delivers several key or mouse escape sequences
+in one read, as can happen with key repeat, the reader decodes the available
+batch before the app renders the next frame.
 
 The app loop is input-driven. It waits until a keyboard or mouse event is
 available, applies the available events to the model, checks the terminal size,
-and renders one diff frame. This keeps idle SSH sessions quiet; terminal resizes
-are picked up after the next input event rather than immediately.
+and renders one diff frame. This keeps idle sessions quiet; terminal resizes are
+picked up after the next input event rather than immediately.
+
+`Terminal.readKeyLine` is also available for tests or environments where raw
+terminal input is not desirable.
+
+## Instrumentation
 
 Apps can observe terminal output volume with the `terminalOutput` hook. LeanTui
 maintains a cumulative count of characters written by the app runner and passes
 that count into the model before each render, making it available for lightweight
 performance displays.
 
-### chess-demo
+For runtime sharing diagnostics, enable `LeanTui.App.SharedReferenceTrace` in
+`LeanTui/App.lean`:
 
-```bash
-lake exe chess-demo
+```lean
+def enabled : Bool := true
 ```
 
-  * move the cursor with arrow keys
-  * click a board square in terminals that support SGR mouse reporting
-  * select and place pieces with Enter or Space
-  * reset the board with `r`
-  * exit using `q` or ESC
+Then rebuild and redirect stderr to a log file while running an app:
 
-The chess demo renders pieces with Unicode chess symbols. It enforces turn order,
-ordinary piece movement, captures, castling, en passant, and automatic queen
-promotion. Check is intentionally omitted to keep the example compact.
+```bash
+lake build chess-demo
+lake exe chess-demo 2> shared.log
+```
 
-## SSH and remote terminals
+The log receives timestamped start/end markers and any `dbgTraceIfShared`
+messages for persistent app-loop values such as the model and screen buffers.
+The TUI itself still renders to stdout.
+
+## SSH and Remote Terminals
 
 LeanTui is expected to work over SSH when the remote process has an allocated
 pseudo-terminal and the local terminal understands common ANSI/xterm escape
-sequences. Prefer running interactive demos through `ssh -t`, for example:
+sequences. Prefer running interactive apps through `ssh -t`, for example:
 
 ```bash
 ssh -t host 'cd /path/to/leanedit && lake exe chess-demo'
@@ -102,3 +95,31 @@ Known remedies for less capable SSH setups:
 Future hardening work should make these assumptions more explicit at runtime:
 detect raw-mode or size-detection failures, add true UTF-8 input decoding, and
 recognize more terminal-specific key escape variants.
+
+## Demos
+
+### screen-edit-demo
+
+```bash
+lake exe screen-edit-demo README.md
+```
+
+  * move with cursor keys
+  * edit screen content
+  * exit using ESC key
+
+### chess-demo
+
+```bash
+lake exe chess-demo
+```
+
+  * move the cursor with arrow keys
+  * click a board square in terminals that support SGR mouse reporting
+  * select and place pieces with Enter or Space
+  * reset the board with `r`
+  * exit using `q` or ESC
+
+The chess demo renders pieces with Unicode chess symbols. It enforces turn order,
+ordinary piece movement, captures, castling, en passant, and automatic queen
+promotion. Check is intentionally omitted to keep the example compact.
