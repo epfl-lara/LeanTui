@@ -149,6 +149,13 @@ def setRookMoved (state : ChessState) (side : Side) (kingside : Bool) : ChessSta
 def absDiff (a b : Nat) : Nat :=
   if a >= b then a - b else b - a
 
+/-- If two natural numbers have zero absolute difference, they are equal. -/
+theorem absDiff_eq_zero {a b : Nat} (h : absDiff a b = 0) : a = b := by
+  unfold absDiff at h
+  split at h
+  next hge => omega
+  next hnge => omega
+
 /-- Checks whether two squares share a row or column. -/
 def sameLine (src dst : Square) : Bool :=
   src.row == dst.row || src.col == dst.col
@@ -238,22 +245,26 @@ def RayDistance.step (src dst : Square) (remaining : Nat)
 
 /-- Computes the number of one-square steps for a line or diagonal, rejecting non-rays. -/
 def rayDistance? (src dst : Square) : Option (RayDistance src dst) :=
-  if hRow : src.row = dst.row then
-    some ({ steps := absDiff src.col dst.col, proof := (by
+  let rowDiff := absDiff src.row dst.row
+  let colDiff := absDiff src.col dst.col
+  if hRow : rowDiff = 0 then
+    some ({ steps := colDiff, proof := (by
         constructor
-        · simp [hRow, stepToward]
-        · exact stepToward_absDiff src.col dst.col) } : RayDistance src dst)
-  else if hCol : src.col = dst.col then
-    some ({ steps := absDiff src.row dst.row, proof := (by
+        · have hRowEq : src.row = dst.row := absDiff_eq_zero (by simpa [rowDiff] using hRow)
+          simp [hRowEq, stepToward]
+        · simpa [colDiff] using stepToward_absDiff src.col dst.col) } : RayDistance src dst)
+  else if hCol : colDiff = 0 then
+    some ({ steps := rowDiff, proof := (by
         constructor
-        · exact stepToward_absDiff src.row dst.row
-        · simp [hCol, stepToward]) } : RayDistance src dst)
-  else if hDiag : absDiff src.row dst.row = absDiff src.col dst.col then
-    some ({ steps := absDiff src.row dst.row, proof := (by
+        · simpa [rowDiff] using stepToward_absDiff src.row dst.row
+        · have hColEq : src.col = dst.col := absDiff_eq_zero (by simpa [colDiff] using hCol)
+          simp [hColEq, stepToward]) } : RayDistance src dst)
+  else if hDiag : rowDiff = colDiff then
+    some ({ steps := rowDiff, proof := (by
         constructor
-        · exact stepToward_absDiff src.row dst.row
+        · simpa [rowDiff] using stepToward_absDiff src.row dst.row
         · rw [hDiag]
-          exact stepToward_absDiff src.col dst.col) } : RayDistance src dst)
+          simpa [colDiff] using stepToward_absDiff src.col dst.col) } : RayDistance src dst)
   else
     none
 
@@ -261,9 +272,9 @@ def rayDistance? (src dst : Square) : Option (RayDistance src dst) :=
 def clearPathLoop (board : Board) (src dst : Square) (distance : RayDistance src dst) : Bool :=
   match distance with
   | { steps := 0, proof := _ } => true
-  | { steps := remaining + 1, proof := proof } =>
+  | { steps := steps1 + 1, proof := p } =>
       if boardGet board src == none then
-        clearPathLoop board (stepSquare src dst) dst (RayDistance.step src dst remaining proof)
+        clearPathLoop board (stepSquare src dst) dst (RayDistance.step src dst steps1 p)
       else
         false
 termination_by distance.steps
