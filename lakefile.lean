@@ -6,8 +6,11 @@ package LeanTui where version := v!"0.1.0"
 
 @[default_target] lean_lib LeanTui
 
-lean_lib Demo.Chess
-
+@[default_target]
 lean_exe «screen-edit-demo» where root := `Demo.ScreenEdit.ScreenEditDemo
 
+@[default_target]
+lean_lib Demo.Chess
+
+@[default_target]
 lean_exe «chess-demo» where root := `Demo.Chess.Main

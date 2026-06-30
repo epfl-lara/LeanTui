@@ -79,22 +79,20 @@ where
 
 /-- Writes wrapped lines starting at a row and returns the next unused row. -/
 def putWrappedLines
-    (screen : Screen) (row col index fuel : Nat) (lines : Array String) (style : Style) :
+    (screen : Screen) (row col index : Nat) (lines : Array String) (style : Style) :
     Screen × Nat :=
-  match fuel with
-  | 0 => (screen, row + index)
-  | fuel + 1 =>
-      if index >= lines.size then
-        (screen, row + index)
-      else
-        let screen := screen.putString (row + index) col (lines.getD index "") style
-        putWrappedLines screen row col (index + 1) fuel lines style
+  if index >= lines.size then
+    (screen, row + index)
+  else
+    let screen := screen.putString (row + index) col (lines.getD index "") style
+    putWrappedLines screen row col (index + 1) lines style
+termination_by lines.size - index
 
 /-- Writes wrapped text starting at a row and returns the next unused row. -/
 def putWrapped
     (screen : Screen) (row col width : Nat) (text : String) (style : Style) : Screen × Nat :=
   let lines := wrapText width text
-  putWrappedLines screen row col 0 (lines.size + 1) lines style
+  putWrappedLines screen row col 0 lines style
 
 /-- Writes a three-column board cell with the piece centered inside it. -/
 def putCell (screen : Screen) (row col : Nat) (ch : Char) (style : Style) : Screen :=
@@ -103,55 +101,37 @@ def putCell (screen : Screen) (row col : Nat) (ch : Char) (style : Style) : Scre
   screen.putChar row (col + 2) ' ' style
 
 /-- Renders one board row into the screen buffer. -/
-def renderBoardRowLoop (screen : Screen) (state : ChessState) (boardRow col fuel : Nat) : Screen :=
-  match fuel with
-  | 0 => screen
-  | fuel + 1 =>
-    if col >= 8 then
-      screen
-    else
+def renderBoardRow (screen : Screen) (state : ChessState) (boardRow col : Nat) : Screen :=
+  if col >= 8 then
+    screen
+  else
     let sq := { row := boardRow, col := col }
     let ch :=
       match boardGet state.board sq with
       | some piece => pieceGlyph piece
       | none => ' '
     let screen := putCell screen (3 + boardRow) (2 + col * 3) ch (squareStyle sq state)
-    renderBoardRowLoop screen state boardRow (col + 1) fuel
-
-/-- Renders one board row into the screen buffer. -/
-def renderBoardRow (screen : Screen) (state : ChessState) (boardRow col : Nat) : Screen :=
-  renderBoardRowLoop screen state boardRow col (8 - col + 1)
-
-/-- Renders all eight rows of the chess board. -/
-def renderBoardLoop (screen : Screen) (state : ChessState) (row fuel : Nat) : Screen :=
-  match fuel with
-  | 0 => screen
-  | fuel + 1 =>
-    if row >= 8 then
-      screen
-    else
-    let screen := screen.putString (3 + row) 1 (rowName row) labelStyle
-    let screen := renderBoardRow screen state row 0
-    renderBoardLoop screen state (row + 1) fuel
+    renderBoardRow screen state boardRow (col + 1)
+termination_by 8 - col
 
 /-- Renders all eight rows of the chess board. -/
 def renderBoard (screen : Screen) (state : ChessState) (row : Nat) : Screen :=
-  renderBoardLoop screen state row (8 - row + 1)
-
-/-- Renders the column labels below the board. -/
-def renderColumnsLoop (screen : Screen) (col fuel : Nat) : Screen :=
-  match fuel with
-  | 0 => screen
-  | fuel + 1 =>
-    if col >= 8 then
-      screen
-    else
-    let screen := screen.putString 11 (3 + col * 3) (columnName col) labelStyle
-    renderColumnsLoop screen (col + 1) fuel
+  if row >= 8 then
+    screen
+  else
+    let screen := screen.putString (3 + row) 1 (rowName row) labelStyle
+    let screen := renderBoardRow screen state row 0
+    renderBoard screen state (row + 1)
+termination_by 8 - row
 
 /-- Renders the column labels below the board. -/
 def renderColumns (screen : Screen) (col : Nat) : Screen :=
-  renderColumnsLoop screen col (8 - col + 1)
+  if col >= 8 then
+    screen
+  else
+    let screen := screen.putString 11 (3 + col * 3) (columnName col) labelStyle
+    renderColumns screen (col + 1)
+termination_by 8 - col
 
 /-- Converts the current chess model into a full terminal screen. -/
 def renderChess (model : ChessModel) : Screen :=
@@ -174,7 +154,7 @@ def renderChess (model : ChessModel) : Screen :=
   let (history1, history2) := historyLines width state.moveHistory
   let screen := screen.putString 13 0 history1 Style.plain
   let screen := screen.putString 14 0 history2 Style.plain
-  screen.putString 15 0 ("out " ++ toString model.terminalOutputChars) Style.plain
+  screen.putString 15 0 ("chars printed: " ++ toString model.terminalOutputChars) Style.plain
 
 /-- Assembles the LeanTui app record for the chess demo. -/
 def chessApp (size : Size) : App ChessModel :=

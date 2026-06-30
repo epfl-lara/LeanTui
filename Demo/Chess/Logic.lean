@@ -85,34 +85,22 @@ def homeRow (side : Side) : Array PieceKind :=
       PieceKind.king, PieceKind.bishop, PieceKind.knight, PieceKind.rook]
 
 /-- Places one side's non-pawn pieces across a home row. -/
-def fillHomeRowLoop (board : Board) (side : Side) (row col fuel : Nat) : Board :=
-  match fuel with
-  | 0 => board
-  | fuel + 1 =>
-    if col >= 8 then
-      board
-    else
-      let piece := { side := side, kind := (homeRow side).getD col PieceKind.pawn }
-      fillHomeRowLoop (boardSet board { row := row, col := col } (some piece)) side row (col + 1) fuel
-
-/-- Places one side's non-pawn pieces across a home row. -/
 def fillHomeRow (board : Board) (side : Side) (row col : Nat) : Board :=
-  fillHomeRowLoop board side row col (8 - col + 1)
-
-/-- Places one side's pawns across a row. -/
-def fillPawnsLoop (board : Board) (side : Side) (row col fuel : Nat) : Board :=
-  match fuel with
-  | 0 => board
-  | fuel + 1 =>
-    if col >= 8 then
-      board
-    else
-      let piece := { side := side, kind := PieceKind.pawn }
-      fillPawnsLoop (boardSet board { row := row, col := col } (some piece)) side row (col + 1) fuel
+  if col >= 8 then
+    board
+  else
+    let piece := { side := side, kind := (homeRow side).getD col PieceKind.pawn }
+    fillHomeRow (boardSet board { row := row, col := col } (some piece)) side row (col + 1)
+termination_by 8 - col
 
 /-- Places one side's pawns across a row. -/
 def fillPawns (board : Board) (side : Side) (row col : Nat) : Board :=
-  fillPawnsLoop board side row col (8 - col + 1)
+  if col >= 8 then
+    board
+  else
+    let piece := { side := side, kind := PieceKind.pawn }
+    fillPawns (boardSet board { row := row, col := col } (some piece)) side row (col + 1)
+termination_by 8 - col
 
 /-- Builds the standard starting chess position. -/
 def initialBoard : Board :=
