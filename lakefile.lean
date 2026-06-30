@@ -10,4 +10,4 @@ lean_lib Demo.Chess
 
 lean_exe «screen-edit-demo» where root := `Demo.ScreenEdit.ScreenEditDemo
 
-lean_exe «chess-demo» where root := `Demo.Chess.ChessDemo
+lean_exe «chess-demo» where root := `Demo.Chess.Main
