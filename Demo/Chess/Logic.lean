@@ -161,43 +161,124 @@ def sameDiagonal (src dst : Square) : Bool :=
 def stepToward (src dst : Nat) : Int :=
   if src < dst then 1 else if src > dst then -1 else 0
 
-/-- Converts signed row and column coordinates into an in-bounds square. -/
-def squareFromInt? (row col : Int) : Option Square :=
-  if row < 0 || row >= 8 || col < 0 || col >= 8 then
+/-- Moves one coordinate by one step toward a target coordinate. -/
+def stepCoord (src dst : Nat) : Nat :=
+  if src < dst then src + 1 else if src > dst then src - 1 else src
+
+/-- Moves one square by one king-like step toward a target square. -/
+def stepSquare (src dst : Square) : Square :=
+  { row := stepCoord src.row dst.row, col := stepCoord src.col dst.col }
+
+/-- Moving by the absolute difference in the signed direction reaches the target coordinate. -/
+theorem stepToward_absDiff (src dst : Nat) :
+    Int.ofNat src + Int.ofNat (absDiff src dst) * stepToward src dst = Int.ofNat dst := by
+  unfold absDiff stepToward
+  split
+  next hge =>
+    by_cases hEq : src = dst
+    · subst hEq
+      simp
+    · have hgt : dst < src := Nat.lt_of_le_of_ne hge (Ne.symm hEq)
+      have hnlt : ¬src < dst := Nat.not_lt_of_ge hge
+      simp [hnlt, hgt]
+      omega
+  next hnge =>
+    have hlt : src < dst := Nat.lt_of_not_ge hnge
+    simp [hlt]
+    omega
+
+/-- Taking one step toward the target reduces the remaining ray distance by one. -/
+theorem stepCoord_ray (src dst remaining : Nat)
+    (h : src + (remaining + 1) * stepToward src dst = dst) :
+         stepCoord src dst + remaining * stepToward (stepCoord src dst) dst = dst :=
+by
+  unfold stepCoord stepToward at *
+  by_cases hlt : src < dst
+  · simp [hlt] at h
+    by_cases hnext : src + 1 < dst
+    · simp [hlt, hnext]
+      omega
+    · have hnlt : ¬dst < src + 1 := by omega
+      simp [hlt, hnext, hnlt]
+      omega
+  · by_cases hgt : src > dst
+    · have hdstlt : dst < src := hgt
+      simp [hlt, hdstlt] at h
+      have hsub : (↑(src - 1) : Int) = (↑src : Int) - 1 := by
+        exact Int.ofNat_sub (m := 1) (n := src) (by omega)
+      by_cases hnext : src - 1 < dst
+      · omega
+      · by_cases hnextgt : dst < src - 1
+        · simp [hlt, hdstlt, hnext, hnextgt]
+          rw [show (↑(src - 1) : Int) = (↑src : Int) - 1 from hsub]
+          omega
+        · have heqnext : src - 1 = dst := by omega
+          simp [hlt, hdstlt, heqnext]
+    · have heq : src = dst := by omega
+      subst heq
+      simp at h ⊢
+
+/-- States that `distance` steps along the square-to-square ray reach the destination. -/
+def IsRayDistance (src dst : Square) (distance : Nat) : Prop :=
+  Int.ofNat src.row + distance * stepToward src.row dst.row = dst.row ∧
+  Int.ofNat src.col + distance * stepToward src.col dst.col = dst.col
+
+/-- The computed distance along a ray, paired with proof that it reaches the destination. -/
+structure RayDistance (src dst : Square) where
+  steps : Nat
+  proof : IsRayDistance src dst steps
+
+/-- Advances a proof-carrying ray distance by one square. -/
+def RayDistance.step (src dst : Square) (remaining : Nat)
+    (proof : IsRayDistance src dst (remaining + 1)) : RayDistance (stepSquare src dst) dst :=
+  { steps := remaining
+    proof := by
+      constructor
+      · exact stepCoord_ray src.row dst.row remaining proof.left
+      · exact stepCoord_ray src.col dst.col remaining proof.right }
+
+/-- Computes the number of one-square steps for a line or diagonal, rejecting non-rays. -/
+def rayDistance? (src dst : Square) : Option (RayDistance src dst) :=
+  if hRow : src.row = dst.row then
+    some ({ steps := absDiff src.col dst.col, proof := (by
+        constructor
+        · simp [hRow, stepToward]
+        · exact stepToward_absDiff src.col dst.col) } : RayDistance src dst)
+  else if hCol : src.col = dst.col then
+    some ({ steps := absDiff src.row dst.row, proof := (by
+        constructor
+        · exact stepToward_absDiff src.row dst.row
+        · simp [hCol, stepToward]) } : RayDistance src dst)
+  else if hDiag : absDiff src.row dst.row = absDiff src.col dst.col then
+    some ({ steps := absDiff src.row dst.row, proof := (by
+        constructor
+        · exact stepToward_absDiff src.row dst.row
+        · rw [hDiag]
+          exact stepToward_absDiff src.col dst.col) } : RayDistance src dst)
+  else
     none
-  else
-    some { row := row.toNat, col := col.toNat }
 
 /-- Walks a ray across the board to decide whether intervening squares are empty. -/
-def clearPathLoopFuel
-    (board : Board) (row col targetRow targetCol rowStep colStep : Int)
-    (isLine: (∃ k: Int, k > 0 &&
-                       row + k*rowStep = targetRow &&
-                       col + k*colStep = targetCol)): Bool :=
-  if row == targetRow && col == targetCol then
-    true
-  else
-    match squareFromInt? row col with
-    | none => false
-    | some sq =>
-        if boardGet board sq == none then
-          clearPathLoopFuel board (row + rowStep) (col + colStep) targetRow targetCol rowStep colStep
-          (sorry)
-        else
-          false
-
-/-- Walks a ray across the board to decide whether intervening squares are empty. -/
-def clearPathLoop
-    (board : Board) (row col targetRow targetCol rowStep colStep : Int) : Bool :=
-  clearPathLoopFuel board row col targetRow targetCol rowStep colStep (sorry)
+def clearPathLoop (board : Board) (src dst : Square) (distance : RayDistance src dst) : Bool :=
+  match distance with
+  | { steps := 0, proof := _ } => true
+  | { steps := remaining + 1, proof := proof } =>
+      if boardGet board src == none then
+        clearPathLoop board (stepSquare src dst) dst (RayDistance.step src dst remaining proof)
+      else
+        false
+termination_by distance.steps
+decreasing_by
+  simp [RayDistance.step]
 
 
 /-- Checks whether every square between two aligned squares is empty. -/
 def clearPath (board : Board) (src dst : Square) : Bool :=
-  let rowStep := stepToward src.row dst.row
-  let colStep := stepToward src.col dst.col
-  clearPathLoop board (Int.ofNat src.row + rowStep) (Int.ofNat src.col + colStep)
-    (Int.ofNat dst.row) (Int.ofNat dst.col) rowStep colStep
+  match rayDistance? src dst with
+  | none => false
+  | some { steps := 0, proof := _ } => true
+  | some { steps := remaining + 1, proof := proof } =>
+      clearPathLoop board (stepSquare src dst) dst (RayDistance.step src dst remaining proof)
 
 /-- Checks pawn-specific movement, including double moves and ordinary captures. -/
 def pawnMoveLegal (state : ChessState) (side : Side) (src dst : Square) : Bool :=
