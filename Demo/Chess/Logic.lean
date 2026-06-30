@@ -204,13 +204,12 @@ by
   · by_cases hgt : src > dst
     · have hdstlt : dst < src := hgt
       simp [hlt, hdstlt] at h
-      have hsub : (↑(src - 1) : Int) = (↑src : Int) - 1 := by
-        exact Int.ofNat_sub (m := 1) (n := src) (by omega)
       by_cases hnext : src - 1 < dst
       · omega
       · by_cases hnextgt : dst < src - 1
         · simp [hlt, hdstlt, hnext, hnextgt]
-          rw [show (↑(src - 1) : Int) = (↑src : Int) - 1 from hsub]
+          rw [Int.ofNat_sub (m := 1) (n := src) (by omega : 1 ≤ src)]
+          simp
           omega
         · have heqnext : src - 1 = dst := by omega
           simp [hlt, hdstlt, heqnext]
