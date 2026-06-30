@@ -170,9 +170,10 @@ def squareFromInt? (row col : Int) : Option Square :=
 
 /-- Walks a ray across the board to decide whether intervening squares are empty. -/
 def clearPathLoopFuel
-    (board : Board) (row col targetRow targetCol rowStep colStep : Int) : Nat -> Bool
-  | 0 => false
-  | fuel + 1 =>
+    (board : Board) (row col targetRow targetCol rowStep colStep : Int)
+    (isLine: (∃ k: Int, k > 0 &&
+                       row + k*rowStep = targetRow &&
+                       col + k*colStep = targetCol)): Bool :=
   if row == targetRow && col == targetCol then
     true
   else
@@ -180,14 +181,16 @@ def clearPathLoopFuel
     | none => false
     | some sq =>
         if boardGet board sq == none then
-          clearPathLoopFuel board (row + rowStep) (col + colStep) targetRow targetCol rowStep colStep fuel
+          clearPathLoopFuel board (row + rowStep) (col + colStep) targetRow targetCol rowStep colStep
+          (sorry)
         else
           false
 
 /-- Walks a ray across the board to decide whether intervening squares are empty. -/
 def clearPathLoop
     (board : Board) (row col targetRow targetCol rowStep colStep : Int) : Bool :=
-  clearPathLoopFuel board row col targetRow targetCol rowStep colStep 8
+  clearPathLoopFuel board row col targetRow targetCol rowStep colStep (sorry)
+
 
 /-- Checks whether every square between two aligned squares is empty. -/
 def clearPath (board : Board) (src dst : Square) : Bool :=
