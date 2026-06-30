@@ -5,6 +5,9 @@ defaultTargets = ["LeanTui"]
 [[lean_lib]]
 name = "LeanTui"
 
+[[lean_lib]]
+name = "Demo.Chess"
+
 [[lean_exe]]
 name = "screen-edit-demo"
 root = "Demo.ScreenEdit.ScreenEditDemo"
