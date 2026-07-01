@@ -246,12 +246,6 @@ def RayDistance.step (src dst : Square) (remaining : Nat)
       · exact stepCoord_ray src.row dst.row remaining proof.left
       · exact stepCoord_ray src.col dst.col remaining proof.right }
 
-set_option LightLean.allow_by_sorry true
-theorem oneMore (x:Int) : x + 1 = x + 1 := easy
-#print axioms oneMore
-theorem oneOrTwoMore (x:Int) : x + 1 = x + 2 := easy
-#print axioms oneOrTwoMore
-
 /-- Computes the number of one-square steps for a line or diagonal, rejecting non-rays. -/
 def rayDistance? (src dst : Square) : Option (RayDistance src dst) :=
   let rowDiff := absDiff src.row dst.row
