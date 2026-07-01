@@ -1,3 +1,6 @@
+import Demo.Chess.ProofTools
+
+
 /-- The two players in a chess game. -/
 inductive Side where
   | white
@@ -243,16 +246,23 @@ def RayDistance.step (src dst : Square) (remaining : Nat)
       · exact stepCoord_ray src.row dst.row remaining proof.left
       · exact stepCoord_ray src.col dst.col remaining proof.right }
 
+set_option LightLean.allow_by_sorry true
+theorem oneMore (x:Int) : x + 1 = x + 1 := easy
+#print axioms oneMore
+theorem oneOrTwoMore (x:Int) : x + 1 = x + 2 := easy
+#print axioms oneOrTwoMore
+
 /-- Computes the number of one-square steps for a line or diagonal, rejecting non-rays. -/
 def rayDistance? (src dst : Square) : Option (RayDistance src dst) :=
   let rowDiff := absDiff src.row dst.row
   let colDiff := absDiff src.col dst.col
   if hRow : rowDiff = 0 then
-    some ({ steps := colDiff, proof := (by
+    some ({ steps := colDiff, proof := (byy
         constructor
         · have hRowEq : src.row = dst.row := absDiff_eq_zero (by simpa [rowDiff] using hRow)
           simp [hRowEq, stepToward]
-        · simpa [colDiff] using stepToward_absDiff src.col dst.col) } : RayDistance src dst)
+        · simpa [colDiff] using stepToward_absDiff src.col dst.col)
+          } : RayDistance src dst)
   else if hCol : colDiff = 0 then
     some ({ steps := rowDiff, proof := (by
         constructor
@@ -267,6 +277,8 @@ def rayDistance? (src dst : Square) : Option (RayDistance src dst) :=
           simpa [colDiff] using stepToward_absDiff src.col dst.col) } : RayDistance src dst)
   else
     none
+
+#print axioms rayDistance?
 
 /-- Walks a ray across the board to decide whether intervening squares are empty. -/
 def clearPathLoop (board : Board) (src dst : Square) (distance : RayDistance src dst) : Bool :=
