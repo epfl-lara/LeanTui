@@ -43,20 +43,41 @@ deriving BEq, Repr
 
 abbrev Board := Array (Option Piece)
 
+/--
+Complete mutable state for the chess demo.
+
+The board uses row-major indexing over an 8 by 8 grid. The remaining fields track
+the UI cursor/selection, whose turn it is, the compact move log, and the rule
+state needed for castling and en passant.
+-/
 structure ChessState where
+  /-- The 64 board squares in row-major order, with `none` for empty squares. -/
   board : Board
+  /-- The square currently highlighted by keyboard or mouse navigation. -/
   cursor : Square := { row := 6, col := 4 }
+  /-- The selected source square for a pending move, if any. -/
   selected : Option Square := none
+  /-- The side whose move is currently being chosen. -/
   turn : Side := Side.white
+  /-- One-based count of successfully applied half-moves. -/
   moveCount : Nat := 1
+  /-- Compact history of applied moves, used for display rather than replay. -/
   moveHistory : Array MoveRecord := #[]
+  /-- Whether White's king has moved, disabling White castling. -/
   whiteKingMoved : Bool := false
+  /-- Whether Black's king has moved, disabling Black castling. -/
   blackKingMoved : Bool := false
+  /-- Whether White's queenside rook has moved, disabling that castle. -/
   whiteQueensideRookMoved : Bool := false
+  /-- Whether White's kingside rook has moved, disabling that castle. -/
   whiteKingsideRookMoved : Bool := false
+  /-- Whether Black's queenside rook has moved, disabling that castle. -/
   blackQueensideRookMoved : Bool := false
+  /-- Whether Black's kingside rook has moved, disabling that castle. -/
   blackKingsideRookMoved : Bool := false
+  /-- The square behind a just-advanced pawn that may be captured en passant. -/
   enPassantTarget : Option Square := none
+  /-- The winning side after a king capture; `none` while the game continues. -/
   winner : Option Side := none
 
 /-- Clamps a natural number into the zero-based range below `limit`. -/
