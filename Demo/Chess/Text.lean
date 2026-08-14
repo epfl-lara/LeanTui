@@ -24,17 +24,6 @@ def pieceGlyph : Piece -> Char
   | { side := Side.black, kind := PieceKind.knight } => '♞'
   | { side := Side.black, kind := PieceKind.pawn } => '♟'
 
-/-- Builds a human-readable piece name for status messages. -/
-def pieceName (piece : Piece) : String :=
-  piece.side.name ++ " " ++
-    match piece.kind with
-    | PieceKind.king => "king"
-    | PieceKind.queen => "queen"
-    | PieceKind.rook => "rook"
-    | PieceKind.bishop => "bishop"
-    | PieceKind.knight => "knight"
-    | PieceKind.pawn => "pawn"
-
 /-- Converts a zero-based board row into a one-based display row. -/
 def rowName (row : Nat) : String :=
   toString (8 - row)

@@ -7,6 +7,27 @@ incremental updates by diffing the previous screen against the next one.
 The first version is intentionally self-contained: it depends only on Lean's
 standard `IO` facilities and writes strings to the terminal.
 
+## HTML Documentation
+
+Build API documentation with [doc-gen4](https://github.com/leanprover/doc-gen4):
+
+```bash
+./scripts/build-docs.sh
+```
+
+The first run downloads the pinned documentation dependencies. The generated
+site starts at `docbuild/.lake/build/doc/index.html`. Serve the directory over
+HTTP so that search and other browser features work correctly:
+
+```bash
+cd docbuild/.lake/build/doc
+python3 -m http.server 8000
+```
+
+Then open <http://localhost:8000/>. The `doc-gen4` revision in
+`docbuild/lakefile.toml` should be updated to match `lean-toolchain` whenever the
+project's Lean version changes.
+
 ## Pieces
 
 - `LeanTui.Ansi`: escape sequence helpers.
