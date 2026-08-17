@@ -63,7 +63,7 @@ namespace Aux
   def baseScreen (size : Size) (fileLines : Array String) : Screen :=
     let titleStyle : Style := { fg := some Color.cyan, bold := true }
     let screen := Screen.blank size
-    let screen := screen.putString 0 0 "Screen Edit Demo for LeanTui. Press ESC to quit" titleStyle
+    let screen := screen.putString 0 0 "Screen Edit Demo for LeanTui" titleStyle
     let visibleRows := if size.rows <= 2 then 0 else size.rows - 2
     let visibleLines := fileLines.extract 0 visibleRows
     screen.putStrings 2 0 visibleLines
@@ -87,15 +87,15 @@ namespace Aux
     else
       model
 
-  /-- Write a typed character at the cursor and advances to the next cell. -/
-  def insertTyped (ch : Char) (model : ScreenEditState) : ScreenEditState :=
-    let model := setMessage model ("typed " ++ String.singleton ch)
-    let screen := model.screen.putChar model.row model.col ch
-    let model := { model with screen := screen }
-    advanceCursor model
-
 end Aux
 open Aux
+
+/-- Write a typed character at the cursor and advances to the next cell. -/
+def insertTyped (ch : Char) (model : ScreenEditState) : ScreenEditState :=
+  let model := setMessage model ("typed " ++ String.singleton ch)
+  let screen := model.screen.putChar model.row model.col ch
+  let model := { model with screen := screen }
+  advanceCursor model
 
 /-- React to a key press: translate a key event into the next state. -/
 def updateRule (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
@@ -118,7 +118,7 @@ def updateRule (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
         | some ch => Step.continue (insertTyped ch model)
         | none => Step.continue (setMessage model ("Unhandled key: " ++ reprStr other))
 
-/-- Renders the current model as a screen with a visibly highlighted cursor cell. -/
+/-- Renders the current model as a screen with a visibly highlighted cursor cell. We maintain a {name}`Screen` inside the state, so we just add some diagnostics on top. -/
 def viewRule (model : ScreenEditState) : Screen :=
   let cursorStyle : Style := { fg := some Color.black, bg := some Color.orange, bold := true }
   let screen := model.screen
