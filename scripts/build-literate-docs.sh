@@ -5,7 +5,8 @@ set -eu
 project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 literatedocbuild_dir="$project_root/literatedocbuild"
 html_dir="$project_root/.lake/build/literate-html"
-entry_page="$html_dir/Demo/ScreenEdit/ScreenEditDemo/index.html"
+screen_edit_page="$html_dir/Demo/ScreenEdit/ScreenEditDemo/index.html"
+chess_page="$html_dir/Demo/Chess/Main/index.html"
 scroll_fix_css="$literatedocbuild_dir/verso-scroll-fix.css"
 config_file="$project_root/literate.toml"
 
@@ -19,11 +20,16 @@ if [ ! -f "$config_file" ]; then
   exit 1
 fi
 
-echo "Building literate HTML for Demo.ScreenEdit and LeanTui..."
+echo "Building literate HTML for LeanTui, Demo.ScreenEdit, and Demo.Chess..."
 (cd "$literatedocbuild_dir" && lake query @LeanTui:literateHtml)
 
-if [ ! -f "$entry_page" ]; then
-  echo "Verso did not generate the expected ScreenEditDemo HTML page." >&2
+if [ ! -f "$screen_edit_page" ]; then
+  echo "Verso did not generate the expected ScreenEdit HTML page." >&2
+  exit 1
+fi
+
+if [ ! -f "$chess_page" ]; then
+  echo "Verso did not generate the expected Chess HTML page." >&2
   exit 1
 fi
 
@@ -37,8 +43,9 @@ cp "$scroll_fix_css" "$generated_override_css"
 cp "$split_js" "$generated_split_js"
 
 echo "Literate documentation built at:"
-echo "  $entry_page"
+echo "  $html_dir"
 echo "Serve it locally with:"
 echo "  python3 -m http.server 8000 -d '$html_dir'"
-echo "Then open:"
+echo "Example pages:"
 echo "  http://localhost:8000/Demo/ScreenEdit/ScreenEditDemo/"
+echo "  http://localhost:8000/Demo/Chess/Main/"

@@ -9,27 +9,31 @@ standard `IO` facilities and writes strings to the terminal.
 
 ### Literate source documentation
 
-Build complete, syntax-highlighted source documentation for the ScreenEdit demo and its LeanTui dependency with Verso:
+Build complete, syntax-highlighted source documentation for LeanTui and its
+ScreenEdit and Chess demos with Verso:
 
 ```bash
 ./scripts/build-literate-docs.sh
 ```
 
-The ScreenEdit source page is generated at
-`literatedocbuild/.lake/build/literate-html/Demo/ScreenEdit/ScreenEditDemo/index.html`.
-Serve the generated site locally with:
+The complete site is generated under `.lake/build/literate-html`. Serve it
+locally with:
 
 ```bash
-python3 -m http.server 8000 \
-  -d literatedocbuild/.lake/build/literate-html
+./scripts/serve-literate-docs.sh
 ```
 
-Then open <http://localhost:8000/Demo/ScreenEdit/ScreenEditDemo/>.
+The site index lists every included module. Direct links to the main demo
+modules are:
+
+- ScreenEdit: <http://localhost:8000/Demo/ScreenEdit/ScreenEditDemo/>
+- Chess: <http://localhost:8000/Demo/Chess/Main/>
 
 Verso is isolated in `literatedocbuild` because it uses Lean `v4.33.0`, while
 the `doc-gen4` build remains pinned to Lean `v4.29.0`. The build also applies a
-local CSS override so long source files scroll correctly in a fixed-height
-browser window.
+local presentation layer that keeps long source files scrollable, separates
+documentation from declarations, provides collapsible function bodies, and
+adds a definition index to each module page.
 
 ## Pieces
 

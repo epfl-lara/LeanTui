@@ -165,7 +165,7 @@ def chessApp (size : Size) : App ChessModel :=
     terminalOutput := fun count model => { model with terminalOutputChars := count }
     mouse := true }
 
-/-- Entry point that detects terminal size and runs the chess demo. -/
-def main (_args : List String) : IO Unit := do
+/-- Detects the terminal size and runs the chess demo. -/
+def chessMain (_args : List String) : IO Unit := do
   let size := (← Terminal.size?).getD fallbackSize
   App.run (chessApp size)

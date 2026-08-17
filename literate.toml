@@ -7,3 +7,6 @@ library = "LeanTui"
 
 [[targets]]
 library = "Demo.ScreenEdit"
+
+[[targets]]
+library = "Demo.Chess"

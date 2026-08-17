@@ -15,4 +15,4 @@ lean_lib Demo.ScreenEdit
 lean_lib Demo.Chess
 
 @[default_target]
-lean_exe «chess-demo» where root := `Demo.Chess.Main
+lean_exe «chess-demo» where root := `Demo.ChessMain
