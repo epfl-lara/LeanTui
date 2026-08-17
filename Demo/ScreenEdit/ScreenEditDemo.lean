@@ -1,7 +1,15 @@
 import LeanTui
 /-!
 # Screen edit: A demo
-A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving. -/
+A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving. Key functions:
+
+## Main definitions:
+
+- `main` - application entry point
+- `updateRule` - describes how application reacts to changes
+- `viewRule` - describes how application shows its state on the screen
+
+-/
 
 open LeanTui
 
@@ -95,7 +103,7 @@ end Aux
 open Aux
 
 /-- React to a key press: translate a key event into the next state. -/
-def updateRules (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
+def updateRule (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
     match key with
     | Key.ctrl 'l' => Step.redrawFull (setMessage model "full render")
     | Key.escape => Step.quit (setMessage model "Goodbye.")
@@ -116,7 +124,7 @@ def updateRules (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
         | none => Step.continue (setMessage model ("Unhandled key: " ++ reprStr other))
 
 /-- Renders the current model as a screen with a visibly highlighted cursor cell. -/
-def viewRules (model : ScreenEditState) : Screen :=
+def viewRule (model : ScreenEditState) : Screen :=
   let cursorStyle : Style := { fg := some Color.black, bg := some Color.orange, bold := true }
   let screen := model.screen
   let screen := screen.putString 0 0
@@ -125,11 +133,11 @@ def viewRules (model : ScreenEditState) : Screen :=
   let baseCell := screen.get { row := model.row, col := model.col }
   screen.putChar model.row model.col baseCell.ch cursorStyle
 
-/-- Creates an App for our application. Behavior given by viewRules and updateRules. -/
+/-- Creates an App for out Screen Edit application. Behavior given by `viewRule` and `updateRule`. -/
 def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState :=
   { init := initModel size fileLines
-    view := viewRules
-    update := updateRules
+    view := viewRule
+    update := updateRule
     terminalOutput := fun count model => { model with terminalOutputChars := count } }
 
 /-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
