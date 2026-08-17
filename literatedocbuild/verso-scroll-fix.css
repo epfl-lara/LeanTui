@@ -63,3 +63,16 @@
     width: auto;
     margin: 0;
 }
+
+/* A function's first source line is its signature proxy. The remaining
+   semantic code is a separate sibling element with a light divider. */
+.code-box > .function-signature,
+.code-box > .function-body {
+    display: block;
+}
+
+.code-box > .function-body {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--verso-code-box-border-color);
+}
