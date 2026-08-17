@@ -1,0 +1,12 @@
+name = "literatedocbuild"
+reservoir = false
+version = "0.1.0"
+
+[[require]]
+name = "verso"
+git = "https://github.com/leanprover/verso.git"
+rev = "v4.33.0"
+
+[[require]]
+name = "LeanTui"
+path = "../"

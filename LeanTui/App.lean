@@ -172,8 +172,8 @@ partial def loopWithReadKey
     loopWithReadKey app meter readKey next state.model
 
 /--
-Runs an application in the alternate screen.
-Raw terminal mode is restored and the alternate screen is left when the app exits.
+Runs an application described by `app`.
+(Uses the alternate screen. Raw terminal mode is restored and the alternate screen is left when the app exits.)
 -/
 def run (app : App Model) : IO Unit := do
   SharedReferenceTrace.logMarker "started"

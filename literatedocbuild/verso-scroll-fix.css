@@ -1,0 +1,12 @@
+/* LeanTui Verso scroll fix */
+.content-wrapper {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.code-content {
+    min-height: 0;
+    overflow: auto;
+}
