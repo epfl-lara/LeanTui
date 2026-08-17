@@ -1,15 +1,11 @@
 import LeanTui
-
 /-!
 # Screen edit demo
-
-A minimal interactive LeanTui example that displays the first page of a text file contents in a terminal screen and allows emphemeral edits on it, without scrolling.
-The purpose is to showcase how to write LeanTui applications.
--/
+A minimal interactive LeanTui example that displays the first page of a text file contents in a terminal screen and allows emphemeral edits on it, without scrolling. The purpose is to showcase how to write LeanTui applications. -/
 
 open LeanTui
 
---! The state of our application
+/-- The state of our application -/
 structure DemoModel where
   size : Size
   screen : Screen
@@ -19,20 +15,26 @@ structure DemoModel where
   scrollRow : Nat := 0
   terminalOutputChars : Nat := 0
 
-def fallbackSize : Size :=
-  { rows := 12, cols := 72 }
+namespace Aux
+  /-- Ensure value:Nat is no more than limit-1 -/
+  def clampTo (limit value : Nat) : Nat :=
+    if limit == 0 then 0 else if value >= limit then limit - 1 else value
 
-def clampTo (limit value : Nat) : Nat :=
-  if limit == 0 then 0 else if value >= limit then limit - 1 else value
+  /-- Obtain terminal size using [Terminal.size](vscode://LeanTui.Terminal.size?) -/
+  def getSize: IO Size := do
+    let s := (<-Terminal.size?).getD { rows := 12, cols := 72 }
+    return s
+end Aux
+open Aux
 
 def blankRowFuel (screen : Screen) (row col fuel : Nat) : Screen :=
   match fuel with
   | 0 => screen
   | fuel + 1 =>
-  if col >= screen.size.cols then
-    screen
-  else
-    blankRowFuel (screen.putChar row col ' ') row (col + 1) fuel
+    if col >= screen.size.cols then
+      screen
+    else
+      blankRowFuel (screen.putChar row col ' ') row (col + 1) fuel
 
 def blankRow (screen : Screen) (row col : Nat) : Screen :=
   blankRowFuel screen row col (screen.size.cols - col + 1)
@@ -118,9 +120,9 @@ def readFileLines (path : String) : IO (Array String) := do
   let content ← IO.FS.readFile path
   pure ((content.split '\n').map String.Slice.toString).toArray
 
---! Application entry is a monadic program that invokes `App.run`
+/-- Application entry is a monadic program that invokes `App.run` -/
 def main (args : List String) : IO Unit := do
-  let size := (← Terminal.size?).getD fallbackSize
+  let size: Size := <-getSize
   match parseArgs args with
   | some path =>
       let lines ← readFileLines path

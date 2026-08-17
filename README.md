@@ -38,6 +38,31 @@ and verify both builds, run:
 The version argument is optional and defaults to `v4.29.0`, the currently
 verified documentation toolchain.
 
+### Literate source documentation
+
+Build complete, syntax-highlighted source documentation for the ScreenEdit demo
+and its LeanTui dependency with Verso:
+
+```bash
+./scripts/build-literate-docs.sh
+```
+
+The ScreenEdit source page is generated at
+`literatedocbuild/.lake/build/literate-html/Demo/ScreenEdit/ScreenEditDemo/index.html`.
+Serve the generated site locally with:
+
+```bash
+python3 -m http.server 8000 \
+  -d literatedocbuild/.lake/build/literate-html
+```
+
+Then open <http://localhost:8000/Demo/ScreenEdit/ScreenEditDemo/>.
+
+Verso is isolated in `literatedocbuild` because it uses Lean `v4.33.0`, while
+the `doc-gen4` build remains pinned to Lean `v4.29.0`. The build also applies a
+local CSS override so long source files scroll correctly in a fixed-height
+browser window.
+
 ## Pieces
 
 - `LeanTui.Ansi`: escape sequence helpers.
