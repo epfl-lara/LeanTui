@@ -1,18 +1,22 @@
 import LeanTui
 /-!
-# Screen edit demo
-A minimal interactive LeanTui example that displays the first page of a text file contents in a terminal screen and allows emphemeral edits on it, without scrolling. The purpose is to showcase how to write LeanTui applications. -/
+# Screen edit: A demo
+A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving. -/
 
 open LeanTui
 
 /-- The state of our screen edit application -/
 structure ScreenEditState where
   size : Size
+  /-- Current screen content being shown -/
   screen : Screen
+  /-- Cursor row -/
   row : Nat := 2
+  /-- Cursor column -/
   col : Nat := 4
+  /-- Original file lines. Screen may have diverged from them. -/
   fileLines : Array String := #[]
-  scrollRow : Nat := 0
+  /-- How many characters were output so far, for performance stats. -/
   terminalOutputChars : Nat := 0
 
 namespace Aux
@@ -31,66 +35,66 @@ namespace Aux
     let content ← IO.FS.readFile path
     pure ((content.split '\n').map String.Slice.toString).toArray
 
+  /-- Clears one screen row from `col` onward using a bounded recursive loop. -/
+  def blankRowFuel (screen : Screen) (row col fuel : Nat) : Screen :=
+    match fuel with
+    | 0 => screen
+    | fuel + 1 =>
+      if col >= screen.size.cols then
+        screen
+      else
+        blankRowFuel (screen.putChar row col ' ') row (col + 1) fuel
+
+  /-- Clears the remainder of a screen row starting at the given column. -/
+  def blankRow (screen : Screen) (row col : Nat) : Screen :=
+    blankRowFuel screen row col (screen.size.cols - col + 1)
+
+  /-- Replaces the status row with a highlighted message for the user. -/
+  def setMessage (model : ScreenEditState) (message : String) : ScreenEditState :=
+    let screen := blankRow model.screen 1 0
+    let messageStyle: Style := { fg := some Color.black, bg := some Color.yellow, bold := true }
+    let screen := screen.putString 1 0 message messageStyle
+    { model with screen := screen }
+
+  /-- Builds the initial screen with a title and the file lines that fit in the terminal. -/
+  def baseScreen (size : Size) (fileLines : Array String) : Screen :=
+    let titleStyle : Style := { fg := some Color.cyan, bold := true }
+    let screen := Screen.blank size
+    let screen := screen.putString 0 0 "Screen Edit Demo for LeanTui. Press ESC to quit" titleStyle
+    let visibleRows := if size.rows <= 2 then 0 else size.rows - 2
+    let visibleLines := fileLines.extract 0 visibleRows
+    screen.putStrings 2 0 visibleLines
+
+  /-- Creates the initial application model and places the cursor within the screen bounds. -/
+  def initModel (size : Size) (fileLines : Array String) : ScreenEditState :=
+    { size := size
+      screen := baseScreen size fileLines
+      row := clampTo size.rows 2
+      col := clampTo size.cols 4
+      fileLines := fileLines }
+
+  /-- Advances the cursor one cell in row-major order without leaving the screen. -/
+  def advanceCursor (model : ScreenEditState) : ScreenEditState :=
+    if model.size.rows == 0 || model.size.cols == 0 then
+      model
+    else if model.col + 1 < model.size.cols then
+      { model with col := model.col + 1 }
+    else if model.row + 1 < model.size.rows then
+      { model with row := model.row + 1, col := 0 }
+    else
+      model
+
+  /-- Write a typed character at the cursor and advances to the next cell. -/
+  def insertTyped (ch : Char) (model : ScreenEditState) : ScreenEditState :=
+    let model := setMessage model ("typed " ++ String.singleton ch)
+    let screen := model.screen.putChar model.row model.col ch
+    let model := { model with screen := screen }
+    advanceCursor model
+
 end Aux
 open Aux
 
-/-- Clears one screen row from `col` onward using a bounded recursive loop. -/
-def blankRowFuel (screen : Screen) (row col fuel : Nat) : Screen :=
-  match fuel with
-  | 0 => screen
-  | fuel + 1 =>
-    if col >= screen.size.cols then
-      screen
-    else
-      blankRowFuel (screen.putChar row col ' ') row (col + 1) fuel
-
-/-- Clears the remainder of a screen row starting at the given column. -/
-def blankRow (screen : Screen) (row col : Nat) : Screen :=
-  blankRowFuel screen row col (screen.size.cols - col + 1)
-
-/-- Replaces the status row with a highlighted message for the user. -/
-def setMessage (model : ScreenEditState) (message : String) : ScreenEditState :=
-  let screen := blankRow model.screen 1 0
-  let messageStyle: Style := { fg := some Color.black, bg := some Color.yellow, bold := true }
-  let screen := screen.putString 1 0 message messageStyle
-  { model with screen := screen }
-
-/-- Builds the initial screen with a title and the file lines that fit in the terminal. -/
-def baseScreen (size : Size) (fileLines : Array String) : Screen :=
-  let titleStyle : Style := { fg := some Color.cyan, bold := true }
-  let screen := Screen.blank size
-  let screen := screen.putString 0 0 "Screen Edit Demo for LeanTui. Press ESC to quit" titleStyle
-  let visibleRows := if size.rows <= 2 then 0 else size.rows - 2
-  let visibleLines := fileLines.extract 0 visibleRows
-  screen.putStrings 2 0 visibleLines
-
-/-- Creates the initial application model and places the cursor within the screen bounds. -/
-def initModel (size : Size) (fileLines : Array String) : ScreenEditState :=
-  { size := size
-    screen := baseScreen size fileLines
-    row := clampTo size.rows 2
-    col := clampTo size.cols 4
-    fileLines := fileLines }
-
-/-- Advances the cursor one cell in row-major order without leaving the screen. -/
-def advanceCursor (model : ScreenEditState) : ScreenEditState :=
-  if model.size.rows == 0 || model.size.cols == 0 then
-    model
-  else if model.col + 1 < model.size.cols then
-    { model with col := model.col + 1 }
-  else if model.row + 1 < model.size.rows then
-    { model with row := model.row + 1, col := 0 }
-  else
-    model
-
-/-- Writes a typed character at the cursor and advances to the next cell. -/
-def insertTyped (ch : Char) (model : ScreenEditState) : ScreenEditState :=
-  let model := setMessage model ("typed " ++ String.singleton ch)
-  let screen := model.screen.putChar model.row model.col ch
-  let model := { model with screen := screen }
-  advanceCursor model
-
-/-- Translates one key event into the next model, a redraw request, or application exit. -/
+/-- React to a key press: translate a key event into the next state. -/
 def updateRules (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
     match key with
     | Key.ctrl 'l' => Step.redrawFull (setMessage model "full render")
@@ -121,7 +125,7 @@ def viewRules (model : ScreenEditState) : Screen :=
   let baseCell := screen.get { row := model.row, col := model.col }
   screen.putChar model.row model.col baseCell.ch cursorStyle
 
-/-- Creates an App value for our application. Behavior given by viewRules and updateRules. -/
+/-- Creates an App for our application. Behavior given by viewRules and updateRules. -/
 def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState :=
   { init := initModel size fileLines
     view := viewRules
