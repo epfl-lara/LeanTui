@@ -101,3 +101,15 @@
 .code-box > .function-body[hidden] {
     display: none;
 }
+
+/* Add the declarations collected from the current module beneath Verso's
+   heading-based table of contents in the existing right sidebar. */
+.page-toc > .definition-index-title {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--verso-border-color);
+}
+
+.page-toc > .definition-index {
+    margin-bottom: 0;
+}

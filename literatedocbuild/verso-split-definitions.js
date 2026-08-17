@@ -1,6 +1,7 @@
 (() => {
   const definitionBinding = "kw-occ-Lean.Parser.Command.definition-";
   let bodyIndex = 0;
+  const definitions = [];
 
   const isDefinition = (node) =>
     node instanceof HTMLElement &&
@@ -11,10 +12,7 @@
     node instanceof HTMLElement &&
     node.matches(".verso-text, .md-text");
 
-  const hasVisibleContent = (node) =>
-    Array.from(node.childNodes).some((child) =>
-      child instanceof HTMLElement || (child.textContent || "").trim() !== ""
-    );
+  const hasVisibleContent = (node) => (node.textContent || "").trim() !== "";
 
   const splitDefinition = (code) => {
     const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
@@ -112,6 +110,13 @@
         output.append(docstring);
       }
       const { signature, body } = splitDefinition(node);
+      const declaration = signature.querySelector(".const[id]");
+      if (declaration) {
+        definitions.push({
+          id: declaration.id,
+          name: declaration.textContent.trim(),
+        });
+      }
       definitionBox.append(signature);
       if (body) {
         makeBodyFoldable(signature, body);
@@ -122,5 +127,65 @@
 
     flushContext();
     original.replaceWith(output);
+  }
+
+  const addDefinitionIndex = () => {
+    if (definitions.length === 0) return;
+
+    let toc = document.querySelector(".page-toc");
+    if (!toc) {
+      const codeContent = document.querySelector(".code-content");
+      if (!codeContent?.parentElement) return;
+      toc = document.createElement("nav");
+      toc.className = "page-toc";
+      toc.setAttribute("aria-label", "Page table of contents");
+      codeContent.after(toc);
+    }
+
+    const title = document.createElement("div");
+    title.className = "page-toc-title definition-index-title";
+    title.textContent = "Definitions";
+
+    const list = document.createElement("ul");
+    list.className = "definition-index";
+    const seen = new Set();
+    for (const definition of definitions) {
+      if (seen.has(definition.id)) continue;
+      seen.add(definition.id);
+
+      const item = document.createElement("li");
+      item.className = "toc-level-2";
+      const link = document.createElement("a");
+      const url = new URL(window.location.href);
+      url.hash = definition.id;
+      link.href = url.href;
+      link.textContent = definition.name;
+      item.append(link);
+      list.append(item);
+    }
+
+    toc.append(title, list);
+  };
+
+  addDefinitionIndex();
+
+  const dropEmptyCodeBoxes = () => {
+    for (const box of document.querySelectorAll(".code-content > .code-box")) {
+      const content = Array.from(box.childNodes)
+        .filter(
+          (node) =>
+            !(node instanceof HTMLElement && node.matches(".copy-button"))
+        )
+        .map((node) => node.textContent || "")
+        .join("")
+        .trim();
+      if (content === "") box.remove();
+    }
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", dropEmptyCodeBoxes);
+  } else {
+    dropEmptyCodeBoxes();
   }
 })();

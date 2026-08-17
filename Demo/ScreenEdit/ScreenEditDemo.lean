@@ -3,14 +3,7 @@ set_option doc.verso true
 set_option doc.verso.module true
 /-!
 # Screen edit: A demo
-A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving. Key functions:
-
-## Main definitions:
-- {lit}`ScreenEditState` - the state of the application
-- {lit}`main` - application entry point, of {lean}`IO Unit` type
-- {lit}`updateRule` - how application changes state in response to key presses
-- {lit}`viewRule` - how application displays its state on the terminal
-
+A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving.
 -/
 
 open LeanTui
