@@ -124,6 +124,4 @@ def main (args : List String) : IO Unit := do
   | some path =>
       let lines ← readFileLines path
       App.run (demoApp size lines)
-  | none =>
-      IO.println "Usage: screen-edit-demo <file>"
-      IO.Process.exit 1
+  | none => IO.Process.exit 1
