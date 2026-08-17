@@ -5,7 +5,7 @@ A minimal interactive LeanTui example that displays the first page of a text fil
 
 open LeanTui
 
-/-- The state of our application -/
+/-- The state of our screen edit application -/
 structure ScreenEditState where
   size : Size
   screen : Screen
@@ -16,16 +16,17 @@ structure ScreenEditState where
   terminalOutputChars : Nat := 0
 
 namespace Aux
-  /-- Clamps a terminal coordinate to the valid range below `limit`. -/
+  /-- Clamp a terminal coordinate to the valid range below `limit`. -/
   def clampTo (limit value : Nat) : Nat :=
     if limit == 0 then 0 else if value >= limit then limit - 1 else value
 
-  /-- Reads the terminal size, using a practical default when it cannot be detected. -/
+  /-- Read the terminal size, using a default when size cannot be detected. -/
   def getScreenSize: IO Size := do
-    let s := (<-Terminal.size?).getD { rows := 12, cols := 72 }
+    let sOpt <- Terminal.size?
+    let s := sOpt.getD { rows := 12, cols := 72 }
     return s
 
-  /-- Loads a text file and splits it into lines stored in an array. -/
+  /-- Load a text file and split it into an array of lines. -/
   def readFileLines (path : String) : IO (Array String) := do
     let content ← IO.FS.readFile path
     pure ((content.split '\n').map String.Slice.toString).toArray
@@ -129,7 +130,7 @@ def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState
 
 /-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
 def main (cmdLineArgs : List String) : IO Unit := do
-  let size: Size := <-getScreenSize
+  let size <- getScreenSize
   match cmdLineArgs with
   | [path] => App.run (screenEditApp size (←readFileLines path))
   | _ => IO.Process.exit 1
