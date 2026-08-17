@@ -1,6 +1,7 @@
 import LeanTui
 
-/-! # Screen edit demo
+/-!
+# Screen edit demo
 
 A minimal interactive LeanTui example that displays the first page of a text file contents in a terminal screen and allows emphemeral edits on it, without scrolling.
 The purpose is to showcase how to write LeanTui applications.
