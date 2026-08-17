@@ -6,7 +6,7 @@ A minimal interactive LeanTui example that displays the first page of a text fil
 open LeanTui
 
 /-- The state of our application -/
-structure DemoModel where
+structure ScreenEditState where
   size : Size
   screen : Screen
   row : Nat := 2
@@ -21,7 +21,7 @@ namespace Aux
     if limit == 0 then 0 else if value >= limit then limit - 1 else value
 
   /-- Reads the terminal size, using a practical default when it cannot be detected. -/
-  def getSize: IO Size := do
+  def getScreenSize: IO Size := do
     let s := (<-Terminal.size?).getD { rows := 12, cols := 72 }
     return s
 
@@ -48,7 +48,7 @@ def blankRow (screen : Screen) (row col : Nat) : Screen :=
   blankRowFuel screen row col (screen.size.cols - col + 1)
 
 /-- Replaces the status row with a highlighted message for the user. -/
-def setMessage (model : DemoModel) (message : String) : DemoModel :=
+def setMessage (model : ScreenEditState) (message : String) : ScreenEditState :=
   let screen := blankRow model.screen 1 0
   let messageStyle: Style := { fg := some Color.black, bg := some Color.yellow, bold := true }
   let screen := screen.putString 1 0 message messageStyle
@@ -64,7 +64,7 @@ def baseScreen (size : Size) (fileLines : Array String) : Screen :=
   screen.putStrings 2 0 visibleLines
 
 /-- Creates the initial application model and places the cursor within the screen bounds. -/
-def initModel (size : Size) (fileLines : Array String) : DemoModel :=
+def initModel (size : Size) (fileLines : Array String) : ScreenEditState :=
   { size := size
     screen := baseScreen size fileLines
     row := clampTo size.rows 2
@@ -72,7 +72,7 @@ def initModel (size : Size) (fileLines : Array String) : DemoModel :=
     fileLines := fileLines }
 
 /-- Advances the cursor one cell in row-major order without leaving the screen. -/
-def advanceCursor (model : DemoModel) : DemoModel :=
+def advanceCursor (model : ScreenEditState) : ScreenEditState :=
   if model.size.rows == 0 || model.size.cols == 0 then
     model
   else if model.col + 1 < model.size.cols then
@@ -83,14 +83,14 @@ def advanceCursor (model : DemoModel) : DemoModel :=
     model
 
 /-- Writes a typed character at the cursor and advances to the next cell. -/
-def insertTyped (ch : Char) (model : DemoModel) : DemoModel :=
+def insertTyped (ch : Char) (model : ScreenEditState) : ScreenEditState :=
   let model := setMessage model ("typed " ++ String.singleton ch)
   let screen := model.screen.putChar model.row model.col ch
   let model := { model with screen := screen }
   advanceCursor model
 
 /-- Translates one key event into the next model, a redraw request, or application exit. -/
-def moveDemo (key : Key) (model : DemoModel) : Step DemoModel :=
+def updateRules (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
     match key with
     | Key.ctrl 'l' => Step.redrawFull (setMessage model "full render")
     | Key.escape => Step.quit (setMessage model "Goodbye.")
@@ -111,7 +111,7 @@ def moveDemo (key : Key) (model : DemoModel) : Step DemoModel :=
         | none => Step.continue (setMessage model ("Unhandled key: " ++ reprStr other))
 
 /-- Renders the current model as a screen with a visibly highlighted cursor cell. -/
-def renderDemo (model : DemoModel) : Screen :=
+def viewRules (model : ScreenEditState) : Screen :=
   let cursorStyle : Style := { fg := some Color.black, bg := some Color.orange, bold := true }
   let screen := model.screen
   let screen := screen.putString 0 0
@@ -120,25 +120,16 @@ def renderDemo (model : DemoModel) : Screen :=
   let baseCell := screen.get { row := model.row, col := model.col }
   screen.putChar model.row model.col baseCell.ch cursorStyle
 
-/-- Creates an App value with initial state given by fileLines and behaview by renderDemo view and moveDemo as update. -/
-def demoApp (size : Size) (fileLines : Array String) : App DemoModel :=
+/-- Creates an App value for our application. Behavior given by viewRules and updateRules. -/
+def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState :=
   { init := initModel size fileLines
-    view := renderDemo
-    update := moveDemo
+    view := viewRules
+    update := updateRules
     terminalOutput := fun count model => { model with terminalOutputChars := count } }
 
-/-- Selects the first command-line argument as the file to display, if one was supplied. -/
-def parseArgs (args : List String) : Option String :=
-  match args with
-  | [] => none
-  | path :: _ => some path
-
-
-/-- Loads the requested file and runs the demo at the detected terminal size. -/
-def main (args : List String) : IO Unit := do
-  let size: Size := <-getSize
-  match parseArgs args with
-  | some path =>
-      let lines ← readFileLines path
-      App.run (demoApp size lines)
-  | none => IO.Process.exit 1
+/-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
+def main (cmdLineArgs : List String) : IO Unit := do
+  let size: Size := <-getScreenSize
+  match cmdLineArgs with
+  | [path] => App.run (screenEditApp size (←readFileLines path))
+  | _ => IO.Process.exit 1

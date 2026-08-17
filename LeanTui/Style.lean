@@ -43,7 +43,7 @@ def bgCode : Color -> String
 
 end Color
 
-/-- Text styling attributes for a terminal cell. -/
+/-- Text styling attributes for a terminal cell (foreground and background colors, bold, inverse status) -/
 structure Style where
   /-- Optional foreground color. -/
   fg : Option Color := none

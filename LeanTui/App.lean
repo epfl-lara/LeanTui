@@ -2,7 +2,7 @@ import LeanTui.Terminal
 
 namespace LeanTui
 
-/-- The result of applying a key event to an application model. -/
+/-- The result of applying a key event to an application model, specifying next state, whether to redraw, whether to quit. -/
 inductive Step (Model : Type) where
   /-- Continue running with the next model. -/
   | continue (model : Model)

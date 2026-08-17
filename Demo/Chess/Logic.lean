@@ -293,7 +293,6 @@ def rayDistance? (src dst : Square) : Option (RayDistance src dst) :=
   else
     none
 
-#print axioms rayDistance?
 
 /-- Walks a ray across the board to decide whether intervening squares are empty. -/
 def clearPathLoop (board : Board) (src dst : Square) (distance : RayDistance src dst) : Bool :=
