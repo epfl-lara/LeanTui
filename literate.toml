@@ -1,0 +1,7 @@
+docstrings_as_text = true
+
+[[targets]]
+library = "LeanTui"
+
+[[targets]]
+library = "Demo.ScreenEdit"

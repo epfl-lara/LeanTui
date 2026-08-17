@@ -1,13 +1,15 @@
 import LeanTui
+set_option doc.verso true
+set_option doc.verso.module true
 /-!
 # Screen edit: A demo
 A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving. Key functions:
 
 ## Main definitions:
-
-- `main` - application entry point
-- `updateRule` - describes how application reacts to changes
-- `viewRule` - describes how application shows its state on the screen
+- {lit}`ScreenEditState` - the state of the application
+- {lit}`main` - application entry point, of {lean}`IO Unit` type
+- {lit}`updateRule` - how application changes state in response to key presses
+- {lit}`viewRule` - how application displays its state on the terminal
 
 -/
 
@@ -28,7 +30,7 @@ structure ScreenEditState where
   terminalOutputChars : Nat := 0
 
 namespace Aux
-  /-- Clamp a terminal coordinate to the valid range below `limit`. -/
+  /-- Clamp a terminal coordinate to the valid range below {lit}`limit`. -/
   def clampTo (limit value : Nat) : Nat :=
     if limit == 0 then 0 else if value >= limit then limit - 1 else value
 
@@ -43,7 +45,7 @@ namespace Aux
     let content ← IO.FS.readFile path
     pure ((content.split '\n').map String.Slice.toString).toArray
 
-  /-- Clears one screen row from `col` onward using a bounded recursive loop. -/
+  /-- Clears one screen row from {lit}`col` onward using a bounded recursive loop. -/
   def blankRowFuel (screen : Screen) (row col fuel : Nat) : Screen :=
     match fuel with
     | 0 => screen
@@ -133,7 +135,7 @@ def viewRule (model : ScreenEditState) : Screen :=
   let baseCell := screen.get { row := model.row, col := model.col }
   screen.putChar model.row model.col baseCell.ch cursorStyle
 
-/-- Creates an App for out Screen Edit application. Behavior given by `viewRule` and `updateRule`. -/
+/-- Creates an App for out Screen Edit application. Behavior given by {name}`viewRule` and {name}`updateRule`. -/
 def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState :=
   { init := initModel size fileLines
     view := viewRule
