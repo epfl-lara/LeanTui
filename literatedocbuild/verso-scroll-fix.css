@@ -36,3 +36,30 @@
     width: auto;
     margin: 0;
 }
+
+/* Function docstrings are moved immediately before their code boxes by
+   verso-split-definitions.js and rendered as visually distinct prose. */
+.code-content > .declaration-doc {
+    box-sizing: border-box;
+    width: auto;
+    max-width: none;
+    margin: 0 0 0.35rem 0 !important;
+    padding: 0.65rem 1rem;
+    color: var(--verso-text-color);
+    background: var(--verso-link-hover-bg);
+    border: 1px solid var(--verso-border-color);
+    border-radius: 0.5rem;
+    font-family: var(--verso-text-font-family);
+    line-height: 1.5;
+}
+
+.code-content > .declaration-doc::before,
+.code-content > .declaration-doc::after {
+    display: none;
+}
+
+.code-content > .declaration-doc > *,
+.code-content > .declaration-doc > p {
+    width: auto;
+    margin: 0;
+}
