@@ -28,6 +28,16 @@ Then open <http://localhost:8000/>. The `doc-gen4` revision in
 `docbuild/lakefile.toml` should be updated to match `lean-toolchain` whenever the
 project's Lean version changes.
 
+To update both the main and documentation projects, refresh their manifests,
+and verify both builds, run:
+
+```bash
+./scripts/bump-lean-version.sh v4.29.0
+```
+
+The version argument is optional and defaults to `v4.29.0`, the currently
+verified documentation toolchain.
+
 ## Pieces
 
 - `LeanTui.Ansi`: escape sequence helpers.
