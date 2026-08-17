@@ -1,4 +1,6 @@
-docstrings_as_text = true
+docstrings_as_text = false
+extra_css = ["verso-scroll-fix.css"]
+extra_js = ["verso-split-definitions.js"]
 
 [[targets]]
 library = "LeanTui"

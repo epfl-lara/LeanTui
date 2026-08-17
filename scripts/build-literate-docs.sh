@@ -6,7 +6,6 @@ project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 literatedocbuild_dir="$project_root/literatedocbuild"
 html_dir="$project_root/.lake/build/literate-html"
 entry_page="$html_dir/Demo/ScreenEdit/ScreenEditDemo/index.html"
-generated_css="$html_dir/literate.css"
 scroll_fix_css="$literatedocbuild_dir/verso-scroll-fix.css"
 config_file="$project_root/literate.toml"
 
@@ -28,16 +27,14 @@ if [ ! -f "$entry_page" ]; then
   exit 1
 fi
 
-if [ ! -f "$generated_css" ]; then
-  echo "Verso did not generate the expected stylesheet: $generated_css" >&2
-  exit 1
-fi
+generated_override_css="$html_dir/$(basename "$scroll_fix_css")"
+split_js="$literatedocbuild_dir/verso-split-definitions.js"
+generated_split_js="$html_dir/$(basename "$split_js")"
 
-if ! grep -Fq '/* LeanTui Verso scroll fix */' "$generated_css"; then
-  echo "Applying the Verso scrolling fix..."
-  printf '\n' >> "$generated_css"
-  cat "$scroll_fix_css" >> "$generated_css"
-fi
+# Verso's facet tracks literate.toml but not changes to files named by extra_css
+# and extra_js, so explicitly synchronize those assets on every invocation.
+cp "$scroll_fix_css" "$generated_override_css"
+cp "$split_js" "$generated_split_js"
 
 echo "Literate documentation built at:"
 echo "  $entry_page"

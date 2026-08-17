@@ -10,3 +10,29 @@
     min-height: 0;
     overflow: auto;
 }
+
+/* Keep declaration and field documentation in source order, but display it
+   as compact prose instead of reproducing the Lean comment delimiters. */
+.code-box .verso-text::before,
+.code-box .verso-text::after,
+.code-box .md-text::before,
+.code-box .md-text::after {
+    display: none;
+}
+
+.code-box .verso-text,
+.code-box .md-text {
+    width: auto;
+    max-width: 80ch;
+    margin-top: 0.2rem;
+    margin-bottom: 0.2rem;
+    padding-left: 0.6rem;
+    border-left: 3px solid var(--verso-border-color);
+    line-height: 1.4;
+}
+
+.code-box .verso-text > p,
+.code-box .md-text > p {
+    width: auto;
+    margin: 0;
+}
