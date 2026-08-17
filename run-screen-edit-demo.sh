@@ -1,1 +1,1 @@
-lake exe screen-edit-demo
+lake exe screen-edit-demo README.md

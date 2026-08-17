@@ -10,8 +10,8 @@ if [ ! -f "$docbuild_dir/lake-manifest.json" ]; then
   (cd "$docbuild_dir" && lake update doc-gen4)
 fi
 
-echo "Building LeanTui HTML documentation..."
-(cd "$docbuild_dir" && lake build LeanTui:docs "$@")
+echo "Building LeanTui and ScreenEditDemo HTML documentation..."
+(cd "$docbuild_dir" && lake build LeanTui:docs Demo.ScreenEdit:docs "$@")
 
 echo "Documentation built at:"
 echo "  $docbuild_dir/.lake/build/doc/index.html"

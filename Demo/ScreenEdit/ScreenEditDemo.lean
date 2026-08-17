@@ -1,7 +1,14 @@
 import LeanTui
 
+/-! # Screen edit demo
+
+A minimal interactive LeanTui example that displays the first page of a text file contents in a terminal screen and allows emphemeral edits on it, without scrolling.
+The purpose is to showcase how to write LeanTui applications.
+-/
+
 open LeanTui
 
+--! The state of our application
 structure DemoModel where
   size : Size
   screen : Screen
@@ -110,6 +117,7 @@ def readFileLines (path : String) : IO (Array String) := do
   let content ← IO.FS.readFile path
   pure ((content.split '\n').map String.Slice.toString).toArray
 
+--! Application entry is a monadic program that invokes `App.run`
 def main (args : List String) : IO Unit := do
   let size := (← Terminal.size?).getD fallbackSize
   match parseArgs args with
