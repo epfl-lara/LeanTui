@@ -1,5 +1,6 @@
 (() => {
   const definitionBinding = "kw-occ-Lean.Parser.Command.definition-";
+  let bodyIndex = 0;
 
   const isDefinition = (node) =>
     node instanceof HTMLElement &&
@@ -45,6 +46,37 @@
     return { signature: code, body };
   };
 
+  const makeBodyFoldable = (signature, body) => {
+    const bodyId = `function-body-${bodyIndex++}`;
+    body.id = bodyId;
+    signature.classList.add("function-body-toggle");
+    signature.tabIndex = 0;
+    signature.setAttribute("role", "button");
+    signature.setAttribute("aria-controls", bodyId);
+    signature.setAttribute("aria-expanded", "false");
+    signature.title = "Click to show the function body";
+    body.hidden = true;
+
+    const toggleBody = () => {
+      body.hidden = !body.hidden;
+      signature.setAttribute("aria-expanded", String(!body.hidden));
+      signature.title = body.hidden
+        ? "Click to show the function body"
+        : "Click to hide the function body";
+    };
+
+    signature.addEventListener("click", (event) => {
+      if (event.target.closest("a")) return;
+      toggleBody();
+    });
+
+    signature.addEventListener("keydown", (event) => {
+      if (event.target !== signature || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      toggleBody();
+    });
+  };
+
   for (const original of document.querySelectorAll(".code-content > .code-box")) {
     if (!Array.from(original.children).some(isDefinition)) continue;
 
@@ -82,6 +114,7 @@
       const { signature, body } = splitDefinition(node);
       definitionBox.append(signature);
       if (body) {
+        makeBodyFoldable(signature, body);
         definitionBox.append(document.createTextNode("\n"), body);
       }
       output.append(definitionBox);

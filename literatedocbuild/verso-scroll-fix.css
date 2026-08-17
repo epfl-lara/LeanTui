@@ -76,3 +76,28 @@
     padding-top: 0.5rem;
     border-top: 1px solid var(--verso-code-box-border-color);
 }
+
+/* The existing semantic signature remains visually unchanged and toggles only
+   its body. The disclosure marker is overlaid so it does not reflow the code. */
+.code-box > .function-body-toggle {
+    position: relative;
+    cursor: pointer;
+}
+
+.code-box > .function-body-toggle::after {
+    content: "▾";
+    position: absolute;
+    top: 0;
+    right: 0;
+    color: var(--verso-muted-color);
+    font-family: var(--verso-text-font-family);
+    font-weight: normal;
+}
+
+.code-box > .function-body-toggle[aria-expanded="false"]::after {
+    content: "▸";
+}
+
+.code-box > .function-body[hidden] {
+    display: none;
+}
