@@ -118,15 +118,15 @@ def updateRule (key : Key) (model : ScreenEditState) : Step ScreenEditState :=
         | some ch => Step.continue (insertTyped ch model)
         | none => Step.continue (setMessage model ("Unhandled key: " ++ reprStr other))
 
-/-- Renders the current model as a screen with a visibly highlighted cursor cell. We maintain a {name}`Screen` inside the state, so we just add some diagnostics on top. -/
-def viewRule (model : ScreenEditState) : Screen :=
+/-- Render {name}`state` on the screen with a visibly highlighted cursor cell. We maintain a {name}`Screen` inside the state, so we only add diagnostics using {name(full := Screen.putString)}`putString`. -/
+def viewRule (state : ScreenEditState) : Screen :=
   let cursorStyle : Style := { fg := some Color.black, bg := some Color.orange, bold := true }
-  let screen := model.screen
+  let screen := state.screen
   let screen := screen.putString 0 0
-    ("Screen Edit Demo. ESC quits. out " ++ toString model.terminalOutputChars)
+    ("Screen Edit Demo. ESC quits. out " ++ toString state.terminalOutputChars)
     { fg := some Color.cyan, bold := true }
-  let baseCell := screen.get { row := model.row, col := model.col }
-  screen.putChar model.row model.col baseCell.ch cursorStyle
+  let baseCell := screen.get { row := state.row, col := state.col }
+  screen.putChar state.row state.col baseCell.ch cursorStyle
 
 /-- Creates an App for out Screen Edit application. Behavior given by {name}`viewRule` and {name}`updateRule`. -/
 def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState :=

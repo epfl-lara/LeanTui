@@ -22,12 +22,17 @@
 
 .code-box .verso-text,
 .code-box .md-text {
-    width: auto;
-    max-width: 80ch;
-    margin-top: 0.2rem;
-    margin-bottom: 0.2rem;
-    padding-left: 0.6rem;
-    border-left: 3px solid var(--verso-border-color);
+    box-sizing: border-box;
+    width: fit-content;
+    max-width: min(80ch, 100%);
+    margin-top: 0.45rem;
+    margin-bottom: 0.1rem;
+    padding: 0.2rem 0.55rem;
+    color: var(--verso-text-color);
+    background: var(--verso-background-color);
+    border: 1px solid var(--verso-border-color);
+    border-left: 4px solid var(--verso-link-color);
+    border-radius: 0.35rem 0.35rem 0 0;
     line-height: 1.4;
 }
 
