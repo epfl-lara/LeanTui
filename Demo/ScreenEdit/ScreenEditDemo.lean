@@ -17,8 +17,6 @@ structure ScreenEditState where
   row : Nat := 2
   /-- Cursor column -/
   col : Nat := 4
-  /-- Original file lines. Screen may have diverged from them. -/
-  fileLines : Array String := #[]
   /-- How many characters were output so far, for performance stats. -/
   terminalOutputChars : Nat := 0
 
@@ -73,8 +71,7 @@ namespace Aux
     { size := size
       screen := baseScreen size fileLines
       row := clampTo size.rows 2
-      col := clampTo size.cols 4
-      fileLines := fileLines }
+      col := clampTo size.cols 4 }
 
   /-- Advances the cursor one cell in row-major order without leaving the screen. -/
   def advanceCursor (model : ScreenEditState) : ScreenEditState :=
@@ -133,7 +130,8 @@ def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState
   { init := initModel size fileLines
     view := viewRule
     update := updateRule
-    terminalOutput := fun count model => { model with terminalOutputChars := 42 } }
+    terminalOutput := fun count model => { model with terminalOutputChars := count }
+    }
 
 /-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
 def main (cmdLineArgs : List String) : IO Unit := do

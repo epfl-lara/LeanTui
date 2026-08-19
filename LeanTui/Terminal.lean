@@ -156,14 +156,14 @@ def restore (mode? : Option Mode) : IO Unit := do
       catch _ =>
         pure ()
 
-/-- Enters the alternate screen, hides the cursor, and clears the screen. -/
+/-- Enters the alternate screen, disables auto-wrap, hides the cursor, and clears the screen. -/
 def enter : IO Unit := do
-  write (Ansi.enterAlternateScreen ++ Ansi.hideCursor ++ Ansi.clearScreen)
+  write (Ansi.enterAlternateScreen ++ Ansi.disableAutoWrap ++ Ansi.hideCursor ++ Ansi.clearScreen)
   flush
 
-/-- Resets styling, shows the cursor, and leaves the alternate screen. -/
+/-- Resets styling, restores auto-wrap, shows the cursor, and leaves the alternate screen. -/
 def leave : IO Unit := do
-  write (Ansi.reset ++ Ansi.showCursor ++ Ansi.leaveAlternateScreen)
+  write (Ansi.reset ++ Ansi.enableAutoWrap ++ Ansi.showCursor ++ Ansi.leaveAlternateScreen)
   flush
 
 /-- Draws a full screen render to standard output. -/

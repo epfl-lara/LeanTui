@@ -179,10 +179,11 @@ def run (app : App Model) : IO Unit := do
   SharedReferenceTrace.logMarker "started"
   let meter ← OutputMeter.create
   let mode? ← Terminal.enableRaw
-  let reader ← Terminal.mkInputReader
-  meter.write (Ansi.enterAlternateScreen ++ Ansi.hideCursor ++ Ansi.clearScreen)
-  Terminal.flush
   try
+    let reader ← Terminal.mkInputReader
+    meter.write
+      (Ansi.enterAlternateScreen ++ Ansi.disableAutoWrap ++ Ansi.hideCursor ++ Ansi.clearScreen)
+    Terminal.flush
     if app.mouse then
       meter.write (Ansi.enableMouseTracking ++ Ansi.enableSgrMouse)
       Terminal.flush

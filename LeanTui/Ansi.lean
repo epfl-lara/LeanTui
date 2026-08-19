@@ -33,6 +33,14 @@ def enterAlternateScreen : String :=
 def leaveAlternateScreen : String :=
   csi "?1049l"
 
+/-- ANSI sequence that disables automatic wrapping at the right screen edge. -/
+def disableAutoWrap : String :=
+  csi "?7l"
+
+/-- ANSI sequence that enables automatic wrapping at the right screen edge. -/
+def enableAutoWrap : String :=
+  csi "?7h"
+
 /-- ANSI sequence that enables basic mouse press reporting. -/
 def enableMouseTracking : String :=
   csi "?1000h"
