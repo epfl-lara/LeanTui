@@ -30,34 +30,6 @@ structure App (Model : Type) where
 
 namespace App
 
-/-
-Self-contained diagnostics for Lean runtime reference sharing in the app loop.
-Set `enabled` to `true` locally when investigating sharing; traces go to stderr.
--/
-namespace SharedReferenceTrace
-
-/-- Whether app-loop shared-reference tracing is enabled. -/
-def enabled : Bool := true
-
-/-- Traces a value when Lean sees it as shared, then returns the value unchanged. -/
-@[inline] def check (label : String) (value : α) : α :=
-  if enabled then
-    dbgTraceIfShared label value
-  else
-    value
-
-/-- Writes a timestamped diagnostics marker to stderr when tracing is enabled. -/
-def logMarker (message : String) : IO Unit := do
-  if enabled then
-    let now ← IO.monoMsNow
-    (← IO.getStderr).putStrLn ("[LeanTui shared-reference trace " ++ toString now ++ "ms] " ++ message)
-
-/-- Checks the model and previously rendered screen that persist across loop turns. -/
-@[inline] def checkLoopState (previous : Screen) (model : Model) : Screen × Model :=
-  (check "LeanTui.App.previousScreen" previous, check "LeanTui.App.model" model)
-
-end SharedReferenceTrace
-
 /-- Internal loop state after applying pending keys. -/
 structure FrameState (Model : Type) where
   /-- Current model. -/
@@ -138,13 +110,12 @@ partial def loopWithReader
     (reader : Terminal.InputReader)
     (previous : Screen)
     (model : Model) : IO Unit := do
-  let (previous, model) := SharedReferenceTrace.checkLoopState previous model
   let keys ← reader.readKeys
   let state := applyKeys app { model := model } keys
   let state ← applyResize app previous state
   let model ← applyOutputCount app meter state.model
   let state := { state with model := model }
-  let next := SharedReferenceTrace.check "LeanTui.App.nextScreen" (app.view state.model)
+  let next := app.view state.model
   drawFrame meter state.redrawFull previous next
   if state.quit then
     pure ()
@@ -158,13 +129,12 @@ partial def loopWithReadKey
     (readKey : IO Key)
     (previous : Screen)
     (model : Model) : IO Unit := do
-  let (previous, model) := SharedReferenceTrace.checkLoopState previous model
   let key ← readKey
   let state := applyKeys app { model := model } [key]
   let state ← applyResize app previous state
   let model ← applyOutputCount app meter state.model
   let state := { state with model := model }
-  let next := SharedReferenceTrace.check "LeanTui.App.nextScreen" (app.view state.model)
+  let next := app.view state.model
   drawFrame meter state.redrawFull previous next
   if state.quit then
     pure ()
@@ -176,7 +146,6 @@ Runs an application described by `app`.
 (Uses the alternate screen. Raw terminal mode is restored and the alternate screen is left when the app exits.)
 -/
 def run (app : App Model) : IO Unit := do
-  SharedReferenceTrace.logMarker "started"
   let meter ← OutputMeter.create
   let mode? ← Terminal.enableRaw
   try
@@ -199,7 +168,6 @@ def run (app : App Model) : IO Unit := do
       Terminal.flush
     Terminal.leave
     Terminal.restore mode?
-    SharedReferenceTrace.logMarker "ended"
 
 end App
 

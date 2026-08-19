@@ -130,7 +130,7 @@ def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState
   { init := initModel size fileLines
     view := viewRule
     update := updateRule
-    terminalOutput := fun count model => { model with terminalOutputChars := count }
+    -- terminalOutput := fun count model => { model with terminalOutputChars := count }
     }
 
 /-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
