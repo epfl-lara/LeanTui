@@ -123,7 +123,7 @@ def viewRule (state : ScreenEditState) : Screen :=
   let cursorStyle : Style := { fg := some Color.black, bg := some Color.orange, bold := true }
   let screen := state.screen
   let screen := screen.putString 0 0
-    ("Screen Edit Demo. ESC quits. out " ++ toString state.terminalOutputChars)
+    "Screen Edit Demo. ESC quits. "
     { fg := some Color.cyan, bold := true }
   let baseCell := screen.get { row := state.row, col := state.col }
   screen.putChar state.row state.col baseCell.ch cursorStyle
@@ -133,7 +133,7 @@ def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState
   { init := initModel size fileLines
     view := viewRule
     update := updateRule
-    terminalOutput := fun count model => { model with terminalOutputChars := count } }
+    terminalOutput := fun count model => { model with terminalOutputChars := 42 } }
 
 /-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
 def main (cmdLineArgs : List String) : IO Unit := do
