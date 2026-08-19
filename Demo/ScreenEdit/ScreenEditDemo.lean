@@ -5,7 +5,6 @@ set_option doc.verso.module true
 # Screen edit: A demo
 A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving.
 -/
-
 open LeanTui
 
 namespace ScreenEdit
@@ -26,21 +25,13 @@ namespace ScreenEdit
 
   /-- Clamp a terminal coordinate to the valid range below {lit}`limit`. -/
   def clampTo (limit value : Nat) : Nat :=
-    if limit == 0 then 0 else if value >= limit then limit - 1 else value
-
-  /-- Clears one screen row from {lit}`col` onward using a bounded recursive loop. -/
-  def blankRowFuel (screen : Screen) (row col fuel : Nat) : Screen :=
-    match fuel with
-    | 0 => screen
-    | fuel + 1 =>
-      if col >= screen.size.cols then
-        screen
-      else
-        blankRowFuel (screen.putChar row col ' ') row (col + 1) fuel
+    if value >= limit then limit - 1 else value
 
   /-- Clears the remainder of a screen row starting at the given column. -/
   def blankRow (screen : Screen) (row col : Nat) : Screen :=
-    blankRowFuel screen row col (screen.size.cols - col + 1)
+    (screen.size.cols - col + 1).fold
+      (fun (i:Nat) _ (screen: Screen) => screen.putChar row (col+i) ' ')
+      screen
 
   def messageStyle: Style := { fg := some Color.black, bg := some Color.yellow, bold := true }
 
@@ -54,9 +45,8 @@ namespace ScreenEdit
 
   /-- Set cursor to a new position (assumed to be in screen) and update the screen. -/
   def updateCursor (newPos: Pos) (state: ScreenEditState): ScreenEditState :=
-    let screen := state.screen
     let prevCell := state.cellAtCursor
-    let screen := screen.set state.pos prevCell
+    let screen := state.screen.set state.pos prevCell
     let newCell := screen.get newPos
     let screen := screen.set newPos { newCell with style := cursorStyle}
     { state with screen := screen, pos := newPos, cellAtCursor := newCell }
