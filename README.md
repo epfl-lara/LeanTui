@@ -10,7 +10,7 @@ standard `IO` facilities and writes strings to the terminal.
 ### Literate source documentation
 
 Build complete, syntax-highlighted source documentation for LeanTui and its
-demos including ScreenEdit and Chess demos with Verso:
+demos including ScreenEdit, Editor, and Chess using Verso tool:
 
 ```bash
 ./scripts/build-literate-docs.sh

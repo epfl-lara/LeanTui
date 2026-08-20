@@ -7,6 +7,7 @@ literatedocbuild_dir="$project_root/literatedocbuild"
 html_dir="$project_root/.lake/build/literate-html"
 screen_edit_page="$html_dir/Demo/ScreenEdit/ScreenEditDemo/index.html"
 chess_page="$html_dir/Demo/Chess/Main/index.html"
+editor_page="$html_dir/Demo/Editor/EditorDemo/index.html"
 scroll_fix_css="$literatedocbuild_dir/verso-scroll-fix.css"
 config_file="$project_root/literate.toml"
 
@@ -20,7 +21,7 @@ if [ ! -f "$config_file" ]; then
   exit 1
 fi
 
-echo "Building literate HTML for LeanTui, Demo.ScreenEdit, and Demo.Chess..."
+echo "Building literate HTML for LeanTui, Demo.ScreenEdit, Demo.Chess, and Demo.Editor..."
 (cd "$literatedocbuild_dir" && lake query @LeanTui:literateHtml)
 
 if [ ! -f "$screen_edit_page" ]; then
@@ -30,6 +31,11 @@ fi
 
 if [ ! -f "$chess_page" ]; then
   echo "Verso did not generate the expected Chess HTML page." >&2
+  exit 1
+fi
+
+if [ ! -f "$editor_page" ]; then
+  echo "Verso did not generate the expected Editor HTML page." >&2
   exit 1
 fi
 
@@ -49,3 +55,4 @@ echo "  python3 -m http.server 8000 -d '$html_dir'"
 echo "Example pages:"
 echo "  http://localhost:8000/Demo/ScreenEdit/ScreenEditDemo/"
 echo "  http://localhost:8000/Demo/Chess/Main/"
+echo "  http://localhost:8000/Demo/Editor/EditorDemo/"

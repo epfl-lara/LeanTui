@@ -10,3 +10,6 @@ library = "Demo.ScreenEdit"
 
 [[targets]]
 library = "Demo.Chess"
+
+[[targets]]
+library = "Demo.Editor"
