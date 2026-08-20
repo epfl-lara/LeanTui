@@ -12,6 +12,12 @@ lean_exe «screen-edit-demo» where root := `Demo.ScreenEditMain
 lean_lib Demo.ScreenEdit
 
 @[default_target]
+lean_lib Demo.Editor
+
+@[default_target]
+lean_exe «editor-demo» where root := `Demo.EditorMain
+
+@[default_target]
 lean_lib Demo.Chess
 
 @[default_target]

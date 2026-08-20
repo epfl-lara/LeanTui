@@ -136,6 +136,16 @@ lake exe screen-edit-demo README.md
   * edit screen content
   * exit using ESC key
 
+### editor-demo
+
+```bash
+lake exe editor-demo README.md
+```
+
+  * move with cursor keys
+  * edit screen content
+  * exit using ESC key
+
 ### chess-demo
 
 ```bash
