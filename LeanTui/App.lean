@@ -27,6 +27,8 @@ structure App (Model : Type) where
   readKey? : Option (IO Key) := none
   /-- Whether the app wants terminal mouse press/release events. -/
   mouse : Bool := false
+  /-- Runs with the final model just before the app exits, e.g. to persist state. -/
+  onExit : Model -> IO Unit := fun _ => pure ()
 
 namespace App
 
@@ -118,7 +120,7 @@ partial def loopWithReader
   let next := app.view state.model
   drawFrame meter state.redrawFull previous next
   if state.quit then
-    pure ()
+    app.onExit state.model
   else
     loopWithReader app meter reader next state.model
 
@@ -137,7 +139,7 @@ partial def loopWithReadKey
   let next := app.view state.model
   drawFrame meter state.redrawFull previous next
   if state.quit then
-    pure ()
+    app.onExit state.model
   else
     loopWithReadKey app meter readKey next state.model
 

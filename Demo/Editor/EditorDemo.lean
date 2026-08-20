@@ -8,8 +8,12 @@ A minimal interactive LeanTui demo. Displays the first page of a text file conte
 open LeanTui
 
 namespace Editor
-  /-- The state of our screen edit application -/
+  /-- The state of our editor application -/
   structure EditorState where
+    /-- Path of the file being edited, used when saving on exit. -/
+    path : String
+    /-- The lines of the file being edited. -/
+    lines : Array String
     /-- Current screen content being shown and modified, including cursor display. -/
     screen : Screen
     screenSize : Size
@@ -17,6 +21,8 @@ namespace Editor
     pos: Pos
     /-- {name}`Cell` underneath the cursor. -/
     cellAtCursor: Cell
+    /-- Whether there are unsaved edits to the file. -/
+    dirty : Bool := false
 
   /-- Load a text file and split it into an array of lines. -/
   def readFileLines (path : String) : IO (Array String) := do
@@ -71,29 +77,51 @@ namespace Editor
     screen.putStrings 2 0 visibleLines
 
     /-- The initial application model with screen displaying the cursor. -/
-  def initModel (size : Size) (fileLines : Array String) : EditorState :=
+  def initModel (path : String) (size : Size) (fileLines : Array String) : EditorState :=
     let initScreen: Screen := baseScreen size fileLines
     let cursorPos := { row := clampTo size.rows 2, col := clampTo size.cols 0 }
     let cell := initScreen.get cursorPos
-    { screenSize := size
+    { path := path
+      lines := fileLines
+      screenSize := size
       screen := initScreen.set cursorPos {cell with style := cursorStyle}
       pos := cursorPos
       cellAtCursor := cell
     }
 
-  /-- Write a typed character at the cursor and advance to the next cell. -/
+  /-- Inserts a character into a string at a column, padding with spaces if needed. -/
+  def insertAt (line : String) (col : Nat) (ch : Char) : String :=
+    let chars := line.toList
+    if col >= chars.length then
+      line ++ String.ofList (List.replicate (col - chars.length) ' ' ++ [ch])
+    else
+      let (before, after) := chars.splitAt col
+      String.ofList (before ++ ch :: after)
+
+  /-- Renders a single file line into a blanked screen row. -/
+  def renderLine (screen : Screen) (row : Nat) (line : String) : Screen :=
+    let screen := blankRow screen row 0
+    screen.putString row 0 line Style.plain
+
+  /-- Write a typed character into the file buffer and screen at the cursor, then advance. -/
   def insertTyped (ch : Char) (model : EditorState) : EditorState :=
     let model := setMessage model ("typed " ++ String.singleton ch)
-    let typedCell := {ch := ch, style := Style.plain}
-    let screen := model.screen.set model.pos typedCell
-    let model := { model with screen := screen, cellAtCursor := typedCell }
-    advanceCursorOnTyping model
+    let lineIdx := model.pos.row - 2
+    if model.pos.row < 2 || lineIdx >= model.lines.size then
+      setMessage model "Cannot edit outside the file lines."
+    else
+      let line := model.lines.getD lineIdx ""
+      let newLine := insertAt line model.pos.col ch
+      let lines := model.lines.set! lineIdx newLine
+      let screen := renderLine model.screen model.pos.row newLine
+      let model := { model with lines := lines, screen := screen, dirty := true }
+      advanceCursorOnTyping { model with cellAtCursor := screen.get model.pos }
 
   /-- React to a key press: translate a key event into the next state. -/
   def updateRule (key : Key) (model : EditorState) : Step EditorState :=
       match key with
       | Key.ctrl 'l' => Step.redrawFull (setMessage model "full render")
-      | Key.escape => Step.quit (setMessage model "Goodbye.")
+      | Key.escape => Step.quit (setMessage model "Saving and exiting...")
       | Key.left =>
           setMessage model "left" |>
           updateCursor {model.pos with col := model.pos.col - 1} |>
@@ -118,18 +146,24 @@ namespace Editor
   /-- Render {name}`state` on the screen. Here we maintain a {name}`Screen` inside {name}`state`, so we return it. -/
   def viewRule (state : EditorState) : Screen := state.screen
 
-  /-- Creates an App for out Editor application. Behavior given by {name}`viewRule` and {name}`updateRule`. -/
-  def editorApp (size : Size) (fileLines : Array String) : App EditorState :=
-    { init := initModel size fileLines
-      view := viewRule
-      update := updateRule }
+  /-- Writes the edited lines back to the file when the app exits. -/
+  def saveFile (state : EditorState) : IO Unit := do
+    let content := String.intercalate "\n" state.lines.toList
+    IO.FS.writeFile state.path content
 
-  /-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
+  /-- Creates an App for our Editor application. Behavior given by {name}`viewRule`, {name}`updateRule`, and {name}`saveFile` on exit. -/
+  def editorApp (size : Size) (path : String) (fileLines : Array String) : App EditorState :=
+    { init := initModel path size fileLines
+      view := viewRule
+      update := updateRule
+      onExit := saveFile }
+
+  /-- App entry: load the requested file and use it as initial screen content, saving edits on exit. -/
   def main (cmdLineArgs : List String) : IO Unit := do
     let sizeOpt <- Terminal.size?
     let size := sizeOpt.getD { rows := 12, cols := 72 }
     match cmdLineArgs with
-    | [path] => App.run (editorApp size (←readFileLines path))
+    | [path] => App.run (editorApp size path (←readFileLines path))
     | _ => IO.Process.exit 1
 
 end Editor
