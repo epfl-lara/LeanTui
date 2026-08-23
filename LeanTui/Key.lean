@@ -38,8 +38,28 @@ inductive Key where
   | home
   /-- End key. -/
   | endKey
+  /-- Page Up key. -/
+  | pageUp
+  /-- Page Down key. -/
+  | pageDown
   /-- Forward delete key. -/
   | delete
+  /-- Shift-modified Up arrow. -/
+  | shiftUp
+  /-- Shift-modified Down arrow. -/
+  | shiftDown
+  /-- Shift-modified Right arrow. -/
+  | shiftRight
+  /-- Shift-modified Left arrow. -/
+  | shiftLeft
+  /-- Shift-modified Home key. -/
+  | shiftHome
+  /-- Shift-modified End key. -/
+  | shiftEnd
+  /-- Shift-modified Page Up key. -/
+  | shiftPageUp
+  /-- Shift-modified Page Down key. -/
+  | shiftPageDown
   /-- A mouse event decoded from an SGR mouse escape sequence. -/
   | mouse (event : MouseEvent)
   /-- An unrecognized escape sequence or byte sequence. -/
@@ -79,7 +99,7 @@ def toInputChar? : Key -> Option Char
 
 /-- Decodes a single command character into a key. -/
 def fromCommandChar : Char -> Key
-  | '\n' => enter
+  | '\n' | '\r' => enter
   | '\t' => tab
   | ch =>
       match fromControlChar? ch with
@@ -97,9 +117,19 @@ def decodeEscape : List Char -> Key
   | ['\x1b', '[', 'F'] => endKey
   | ['\x1b', '[', '1', '~'] => home
   | ['\x1b', '[', '4', '~'] => endKey
+  | ['\x1b', '[', '5', '~'] => pageUp
+  | ['\x1b', '[', '6', '~'] => pageDown
   | ['\x1b', 'O', 'H'] => home
   | ['\x1b', 'O', 'F'] => endKey
   | ['\x1b', '[', '3', '~'] => delete
+  | ['\x1b', '[', '1', ';', '2', 'A'] => shiftUp
+  | ['\x1b', '[', '1', ';', '2', 'B'] => shiftDown
+  | ['\x1b', '[', '1', ';', '2', 'C'] => shiftRight
+  | ['\x1b', '[', '1', ';', '2', 'D'] => shiftLeft
+  | ['\x1b', '[', '1', ';', '2', 'H'] => shiftHome
+  | ['\x1b', '[', '1', ';', '2', 'F'] => shiftEnd
+  | ['\x1b', '[', '5', ';', '2', '~'] => shiftPageUp
+  | ['\x1b', '[', '6', ';', '2', '~'] => shiftPageDown
   | chars => unknown (String.ofList chars)
 
 /-- Decodes a complete input string into a single key. -/
