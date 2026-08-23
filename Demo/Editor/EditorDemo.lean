@@ -4,7 +4,7 @@ set_option doc.verso true
 set_option doc.verso.module true
 /-!
 # Editor: A demo
-A minimal interactive LeanTui demo. Displays a scrollable view of a text file in a terminal screen, allows edits to it, and saves the changes back to the file on exit.
+A minimal interactive LeanTui demo. Displays a scrollable view of a text file in a terminal screen, allows edits to it, and saves changes on Ctrl-S.
 -/
 open LeanTui
 open LeanEffects
@@ -12,7 +12,7 @@ open LeanEffects
 namespace Editor
   /-- The state of our editor application -/
   structure EditorState where
-    /-- Path of the file being edited, used when saving on exit. -/
+    /-- Path of the file being edited, used when saving. -/
     path : String
     /-- The lines of the file being edited. -/
     lines : Array String
@@ -179,10 +179,10 @@ namespace Editor
           updateCursor { model.pos with col := model.pos.col - 1 } model
 
   /-- React to a key press: translate a key event into the next state. -/
-  def updateRule (key : Key) (model : EditorState) : Step EditorState :=
+  def updatePure (key : Key) (model : EditorState) : Step EditorState :=
       match key with
       | Key.ctrl 'l' => Step.redrawFull (setMessage model "full render")
-      | Key.escape => Step.quit (setMessage model "Saving and exiting...")
+      | Key.escape => Step.quit (setMessage model "Goodbye.")
       | Key.left =>
           setMessage model "left" |>
           updateCursor {model.pos with col := model.pos.col - 1} |>
@@ -220,7 +220,7 @@ namespace Editor
   /-- Render {name}`state` on the screen. Here we maintain a {name}`Screen` inside {name}`state`, so we return it. -/
   def viewRule (state : EditorState) : Screen := state.screen
 
-  /-- Writes the edited lines back to the file when the app exits. -/
+  /-- Describes writing the edited lines back to the file. -/
   def saveFile (state : EditorState) : Command FileSystem.Effect Unit := do
     let content := String.intercalate "\n" state.lines.toList
     FileSystem.writeFile state.path content
@@ -233,17 +233,16 @@ namespace Editor
         saveFile model
         pure (Step.continue (setMessage { model with dirty := false } "Saved."))
     | _ =>
-        pure (updateRule key model)
+        pure (updatePure key model)
 
-  /-- Creates an App for our Editor application. Behavior given by {name}`viewRule`, {name}`updateRule`, and {name}`saveFile` on exit. -/
+  /-- Creates an App for our Editor application with explicit Ctrl-S saving. -/
   def editorApp (size : Size) (path : String) (fileLines : Array String) :
       App EditorState FileSystem.Effect :=
     { init := initModel path size fileLines
       view := viewRule
-      update := updateEditor
-      onExit := saveFile }
+      update := updateEditor }
 
-  /-- App entry: load the requested file and use it as initial screen content, saving edits on exit. -/
+  /-- App entry: load the requested file and use it as initial screen content. -/
   def main (cmdLineArgs : List String) : IO Unit := do
     let sizeOpt <- Terminal.size?
     let size := sizeOpt.getD { rows := 12, cols := 72 }
