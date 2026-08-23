@@ -225,12 +225,22 @@ namespace Editor
     let content := String.intercalate "\n" state.lines.toList
     FileSystem.writeFile state.path content
 
+  /-- Handles one key, saving immediately on Ctrl-S and otherwise applying the pure editing rule. -/
+  def updateEditor (key : Key) (model : EditorState) :
+      Command FileSystem.Effect (Step EditorState) := do
+    match key with
+    | Key.ctrl 's' =>
+        saveFile model
+        pure (Step.continue (setMessage { model with dirty := false } "Saved."))
+    | _ =>
+        pure (updateRule key model)
+
   /-- Creates an App for our Editor application. Behavior given by {name}`viewRule`, {name}`updateRule`, and {name}`saveFile` on exit. -/
   def editorApp (size : Size) (path : String) (fileLines : Array String) :
       App EditorState FileSystem.Effect :=
     { init := initModel path size fileLines
       view := viewRule
-      update := fun key model => pure (updateRule key model)
+      update := updateEditor
       onExit := saveFile }
 
   /-- App entry: load the requested file and use it as initial screen content, saving edits on exit. -/

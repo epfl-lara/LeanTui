@@ -23,8 +23,8 @@ locally with:
 ./scripts/serve-literate-docs.sh
 ```
 
-The site index lists every included module. Direct links to the main demo
-modules are:
+The site index lists every included module.
+
 
 - ScreenEdit: <http://localhost:8000/Demo/ScreenEdit/ScreenEditDemo/>
 - Chess: <http://localhost:8000/Demo/Chess/Main/>
