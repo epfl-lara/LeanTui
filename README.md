@@ -16,7 +16,7 @@ demos including ScreenEdit, Editor, and Chess using Verso tool:
 ./scripts/build-literate-docs.sh
 ```
 
-The complete site is generated under `.lake/build/literate-html`. Serve it
+The site is generated under `.lake/build/literate-html`. Serve it
 locally with:
 
 ```bash

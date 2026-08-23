@@ -4,6 +4,8 @@ open System Lake DSL
 
 package LeanTui where version := v!"0.1.0"
 
+lean_lib LeanEffects
+
 @[default_target] lean_lib LeanTui
 
 @[default_target]

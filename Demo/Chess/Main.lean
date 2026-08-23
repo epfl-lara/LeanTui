@@ -1,7 +1,9 @@
 import LeanTui
+import LeanEffects.Command
 import Demo.Chess.Text
 
 open LeanTui
+open LeanEffects
 
 structure ChessModel where
   size : Size
@@ -157,10 +159,10 @@ def renderChess (model : ChessModel) : Screen :=
   screen.putString 15 0 ("chars printed: " ++ toString model.terminalOutputChars) Style.plain
 
 /-- Assembles the LeanTui app record for the chess demo. -/
-def chessApp (size : Size) : App ChessModel :=
+def chessApp (size : Size) : App ChessModel NoEffect :=
   { init := initModel size
     view := renderChess
-    update := updateChess
+    update := fun key model => pure (updateChess key model)
     resize := fun size model => { model with size := size }
     terminalOutput := fun count model => { model with terminalOutputChars := count }
     mouse := true }
@@ -168,4 +170,4 @@ def chessApp (size : Size) : App ChessModel :=
 /-- Detects the terminal size and runs the chess demo. -/
 def chessMain (_args : List String) : IO Unit := do
   let size := (← Terminal.size?).getD fallbackSize
-  App.run (chessApp size)
+  App.run NoEffect.interpret (chessApp size)

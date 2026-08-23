@@ -1,4 +1,5 @@
 import LeanTui
+import LeanEffects.FileSystem
 set_option doc.verso true
 set_option doc.verso.module true
 /-!
@@ -6,6 +7,7 @@ set_option doc.verso.module true
 A minimal interactive LeanTui demo. Displays a scrollable view of a text file in a terminal screen, allows edits to it, and saves the changes back to the file on exit.
 -/
 open LeanTui
+open LeanEffects
 
 namespace Editor
   /-- The state of our editor application -/
@@ -27,8 +29,8 @@ namespace Editor
     scrollTop : Nat := 0
 
   /-- Load a text file and split it into an array of lines. -/
-  def readFileLines (path : String) : IO (Array String) := do
-    let content ← IO.FS.readFile path
+  def readFileLines (path : String) : Command FileSystem.Effect (Array String) := do
+    let content ← FileSystem.readFile path
     pure ((content.split '\n').map String.Slice.toString).toArray
 
   /-- Clamp a terminal coordinate to the valid range below {lit}`limit`. -/
@@ -219,15 +221,16 @@ namespace Editor
   def viewRule (state : EditorState) : Screen := state.screen
 
   /-- Writes the edited lines back to the file when the app exits. -/
-  def saveFile (state : EditorState) : IO Unit := do
+  def saveFile (state : EditorState) : Command FileSystem.Effect Unit := do
     let content := String.intercalate "\n" state.lines.toList
-    IO.FS.writeFile state.path content
+    FileSystem.writeFile state.path content
 
   /-- Creates an App for our Editor application. Behavior given by {name}`viewRule`, {name}`updateRule`, and {name}`saveFile` on exit. -/
-  def editorApp (size : Size) (path : String) (fileLines : Array String) : App EditorState :=
+  def editorApp (size : Size) (path : String) (fileLines : Array String) :
+      App EditorState FileSystem.Effect :=
     { init := initModel path size fileLines
       view := viewRule
-      update := updateRule
+      update := fun key model => pure (updateRule key model)
       onExit := saveFile }
 
   /-- App entry: load the requested file and use it as initial screen content, saving edits on exit. -/
@@ -235,7 +238,9 @@ namespace Editor
     let sizeOpt <- Terminal.size?
     let size := sizeOpt.getD { rows := 12, cols := 72 }
     match cmdLineArgs with
-    | [path] => App.run (editorApp size path (←readFileLines path))
+    | [path] =>
+        let fileLines ← (readFileLines path).run FileSystem.interpret
+        App.run FileSystem.interpret (editorApp size path fileLines)
     | _ => IO.Process.exit 1
 
 end Editor

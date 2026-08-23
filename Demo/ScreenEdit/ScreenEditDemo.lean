@@ -1,4 +1,5 @@
 import LeanTui
+import LeanEffects.FileSystem
 set_option doc.verso true
 set_option doc.verso.module true
 /-!
@@ -6,6 +7,7 @@ set_option doc.verso.module true
 A minimal interactive LeanTui demo. Displays the first page of a text file contents in a terminal screen and allows emphemeral edits to it, without scrolling or saving.
 -/
 open LeanTui
+open LeanEffects
 
 namespace ScreenEdit
   /-- The state of our screen edit application -/
@@ -19,8 +21,8 @@ namespace ScreenEdit
     cellAtCursor: Cell
 
   /-- Load a text file and split it into an array of lines. -/
-  def readFileLines (path : String) : IO (Array String) := do
-    let content ← IO.FS.readFile path
+  def readFileLines (path : String) : Command FileSystem.Effect (Array String) := do
+    let content ← FileSystem.readFile path
     pure ((content.split '\n').map String.Slice.toString).toArray
 
   /-- Clamp a terminal coordinate to the valid range below {lit}`limit`. -/
@@ -119,17 +121,19 @@ namespace ScreenEdit
   def viewRule (state : ScreenEditState) : Screen := state.screen
 
   /-- Creates an App for out Screen Edit application. Behavior given by {name}`viewRule` and {name}`updateRule`. -/
-  def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState :=
+  def screenEditApp (size : Size) (fileLines : Array String) : App ScreenEditState NoEffect :=
     { init := initModel size fileLines
       view := viewRule
-      update := updateRule }
+      update := fun key model => pure (updateRule key model) }
 
   /-- App entry: load the requested file and use it as inital screen content, allowing ephemeral edits. -/
   def main (cmdLineArgs : List String) : IO Unit := do
     let sizeOpt <- Terminal.size?
     let size := sizeOpt.getD { rows := 12, cols := 72 }
     match cmdLineArgs with
-    | [path] => App.run (screenEditApp size (←readFileLines path))
+    | [path] =>
+        let fileLines ← (readFileLines path).run FileSystem.interpret
+        App.run NoEffect.interpret (screenEditApp size fileLines)
     | _ => IO.Process.exit 1
 
 end ScreenEdit
