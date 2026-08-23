@@ -19,6 +19,19 @@ namespace Editor
     col : Nat
   deriving BEq, Repr
 
+  /-- A reversible text splice plus the editor state needed to restore either side. -/
+  structure EditDiff where
+    startPos : TextPos
+    removedText : String
+    insertedText : String
+    cursorBefore : TextPos
+    selectionBefore : Option TextPos
+    cursorAfter : TextPos
+    selectionAfter : Option TextPos
+    revisionBefore : Nat
+    revisionAfter : Nat
+  deriving Repr
+
   /-- Filesystem and clipboard capabilities used by the editor. -/
   abbrev EditorEffect := Sum FileSystem.Effect Clipboard.Effect
 
@@ -32,13 +45,16 @@ namespace Editor
     scrollTop : Nat := 0
     scrollLeft : Nat := 0
     dirty : Bool := false
+    revision : Nat := 0
+    savedRevision : Nat := 0
+    nextRevision : Nat := 1
+    undoStack : List EditDiff := []
+    redoStack : List EditDiff := []
     message : String := "Ctrl-S saves. Shift+arrows select. Ctrl-C/V copy/paste."
 
-  def messageStyle : Style :=
-    { fg := some Color.black, bg := some Color.yellow, bold := true }
-
-  def titleStyle : Style :=
-    { fg := some Color.cyan, bold := true }
+  /-- Shared full-width style for the help header and status footer. -/
+  def chromeStyle : Style :=
+    { fg := some Color.white, bg := some Color.blue, bold := true }
 
   def cursorStyle : Style :=
     { fg := some Color.black, bg := some Color.orange, bold := true }
@@ -62,6 +78,11 @@ namespace Editor
 
   def contentRows (size : Size) : Nat :=
     if size.rows <= 2 then 0 else size.rows - 2
+
+  /-- Returns the final path component for display in the status line. -/
+  def fileName (path : String) : String :=
+    let name := (path.toList.reverse.takeWhile fun ch => ch != '/' && ch != '\\').reverse
+    if name.isEmpty then path else String.ofList name
 
   def lineLength (model : EditorState) (line : Nat) : Nat :=
     (model.lines.getD line "").toList.length
@@ -176,76 +197,106 @@ namespace Editor
       (lines : Array String) (startLine endLine : Nat) (replacement : List String) : Array String :=
     (lines.toList.take startLine ++ replacement ++ lines.toList.drop endLine).toArray
 
+  def splitText (text : String) : List String :=
+    ((text.split '\n').map String.Slice.toString).toArray.toList
+
+  /-- Returns the text in a half-open document range. -/
+  def textInRange (model : EditorState) (startPos endPos : TextPos) : String :=
+    if startPos.line == endPos.line then
+      stringSlice (model.lines.getD startPos.line "") startPos.col endPos.col
+    else
+      let first := stringDrop (model.lines.getD startPos.line "") startPos.col
+      let middle := (model.lines.toList.drop (startPos.line + 1)).take (endPos.line - startPos.line - 1)
+      let last := stringTake (model.lines.getD endPos.line "") endPos.col
+      String.intercalate "\n" (first :: middle ++ [last])
+
   /-- Returns the selected text, retaining newlines in a multiline selection. -/
   def selectedText (model : EditorState) : String :=
     match selectionRange? model with
     | none => ""
-    | some (startPos, endPos) =>
-        if startPos.line == endPos.line then
-          stringSlice (model.lines.getD startPos.line "") startPos.col endPos.col
-        else
-          let first := stringDrop (model.lines.getD startPos.line "") startPos.col
-          let middle := (model.lines.toList.drop (startPos.line + 1)).take (endPos.line - startPos.line - 1)
-          let last := stringTake (model.lines.getD endPos.line "") endPos.col
-          String.intercalate "\n" (first :: middle ++ [last])
+    | some (startPos, endPos) => textInRange model startPos endPos
+
+  /-- Computes the end position of text inserted at a document position. -/
+  def endAfterText (startPos : TextPos) (text : String) : TextPos :=
+    match splitText text with
+    | [] => startPos
+    | [piece] => { startPos with col := startPos.col + piece.toList.length }
+    | _ :: rest =>
+        { line := startPos.line + rest.length, col := rest.getLast!.toList.length }
+
+  /-- Applies a text splice without adding it to either history stack. -/
+  def replaceRangeRaw
+      (model : EditorState) (startPos endPos : TextPos) (insertedText : String) : EditorState :=
+    let startLine := model.lines.getD startPos.line ""
+    let endLine := model.lines.getD endPos.line ""
+    let linePrefix := stringTake startLine startPos.col
+    let suffix := stringDrop endLine endPos.col
+    match splitText insertedText with
+    | [] => model
+    | [piece] =>
+        let lines := replaceLineRange model.lines startPos.line (endPos.line + 1)
+          [linePrefix ++ piece ++ suffix]
+        let cursor := endAfterText startPos insertedText
+        ensureVisible { model with lines := lines, cursor := cursor, selectionAnchor := none }
+    | first :: rest =>
+        let last := rest.getLast!
+        let middle := rest.dropLast
+        let replacement := (linePrefix ++ first) :: middle ++ [last ++ suffix]
+        let lines := replaceLineRange model.lines startPos.line (endPos.line + 1) replacement
+        let cursor := endAfterText startPos insertedText
+        ensureVisible { model with lines := lines, cursor := cursor, selectionAnchor := none }
+
+  /-- Records and applies one reversible text splice. -/
+  def commitEdit
+      (model : EditorState) (startPos endPos : TextPos) (insertedText : String) : EditorState :=
+    let removedText := textInRange model startPos endPos
+    if removedText == insertedText then model
+    else
+      let revisionAfter := model.nextRevision
+      let after := replaceRangeRaw model startPos endPos insertedText
+      let diff : EditDiff :=
+        { startPos := startPos
+          removedText := removedText
+          insertedText := insertedText
+          cursorBefore := model.cursor
+          selectionBefore := model.selectionAnchor
+          cursorAfter := after.cursor
+          selectionAfter := after.selectionAnchor
+          revisionBefore := model.revision
+          revisionAfter := revisionAfter }
+      let nextRevision := revisionAfter + 1
+      let undoStack := diff :: model.undoStack
+      let dirty := revisionAfter != model.savedRevision
+      let after := { after with revision := revisionAfter }
+      let after := { after with nextRevision := nextRevision }
+      let after := { after with undoStack := undoStack }
+      let after := { after with redoStack := [] }
+      { after with dirty := dirty }
 
   /-- Deletes the selection and places the cursor at its beginning. -/
   def deleteSelection (model : EditorState) : EditorState :=
     match selectionRange? model with
     | none => model
-    | some (startPos, endPos) =>
-        let startLine := model.lines.getD startPos.line ""
-        let endLine := model.lines.getD endPos.line ""
-        let replacement := stringTake startLine startPos.col ++ stringDrop endLine endPos.col
-        let lines := replaceLineRange model.lines startPos.line (endPos.line + 1) [replacement]
-        ensureVisible
-          { model with lines := lines, cursor := startPos, selectionAnchor := none, dirty := true }
+    | some (startPos, endPos) => commitEdit model startPos endPos ""
 
   /-- Inserts text at the cursor, replacing the selection and supporting embedded newlines. -/
   def insertText (text : String) (model : EditorState) : EditorState :=
     if text.isEmpty then model
     else
-      let model := deleteSelection model
-      let cursor := model.cursor
-      let line := model.lines.getD cursor.line ""
-      let linePrefix := stringTake line cursor.col
-      let suffix := stringDrop line cursor.col
-      let pieces := ((text.split '\n').map String.Slice.toString).toArray.toList
-      match pieces with
-      | [] => model
-      | [piece] =>
-          let lines := model.lines.set! cursor.line (linePrefix ++ piece ++ suffix)
-          let nextCursor : TextPos :=
-            { line := cursor.line, col := cursor.col + piece.toList.length }
-          ensureVisible
-            { model with lines := lines, cursor := nextCursor, selectionAnchor := none, dirty := true }
-      | first :: rest =>
-          let last := rest.getLast!
-          let middle := rest.dropLast
-          let replacement := (linePrefix ++ first) :: middle ++ [last ++ suffix]
-          let lines := replaceLineRange model.lines cursor.line (cursor.line + 1) replacement
-          let nextCursor : TextPos :=
-            { line := cursor.line + replacement.length - 1, col := last.toList.length }
-          ensureVisible
-            { model with lines := lines, cursor := nextCursor, selectionAnchor := none, dirty := true }
+      match selectionRange? model with
+      | some (startPos, endPos) => commitEdit model startPos endPos text
+      | none => commitEdit model model.cursor model.cursor text
 
   def backspace (model : EditorState) : EditorState :=
     if (selectionRange? model).isSome then
       setMessage (deleteSelection model) "Deleted selection."
     else if model.cursor.col > 0 then
-      let line := model.lines.getD model.cursor.line ""
-      let col := model.cursor.col
-      let replacement := stringTake line (col - 1) ++ stringDrop line col
-      let lines := model.lines.set! model.cursor.line replacement
-      let nextCursor : TextPos := { line := model.cursor.line, col := col - 1 }
-      setMessage (ensureVisible { model with lines := lines, cursor := nextCursor, dirty := true }) "Backspace."
+      let startPos : TextPos := { model.cursor with col := model.cursor.col - 1 }
+      setMessage (commitEdit model startPos model.cursor "") "Backspace."
     else if model.cursor.line > 0 then
       let previousLine := model.cursor.line - 1
-      let previous := model.lines.getD previousLine ""
-      let current := model.lines.getD model.cursor.line ""
-      let lines := replaceLineRange model.lines previousLine (model.cursor.line + 1) [previous ++ current]
-      let nextCursor : TextPos := { line := previousLine, col := previous.toList.length }
-      setMessage (ensureVisible { model with lines := lines, cursor := nextCursor, dirty := true }) "Joined lines."
+      let startPos : TextPos := { line := previousLine, col := lineLength model previousLine }
+      setMessage (commitEdit model startPos model.cursor "") "Joined lines."
     else model
 
   /-- Deletes the character in front of the cursor, or joins the next line at end-of-line. -/
@@ -257,15 +308,52 @@ namespace Editor
       let chars := line.toList
       if model.cursor.col < chars.length then
         let deleted := chars.getD model.cursor.col ' '
-        let replacement := stringTake line model.cursor.col ++ stringDrop line (model.cursor.col + 1)
-        let lines := model.lines.set! model.cursor.line replacement
-        setMessage { model with lines := lines, dirty := true }
-          ("Deleted " ++ reprStr deleted ++ ".")
+        let endPos : TextPos := { model.cursor with col := model.cursor.col + 1 }
+        setMessage (commitEdit model model.cursor endPos "") ("Deleted " ++ reprStr deleted ++ ".")
       else if model.cursor.line < lastLine model then
-        let next := model.lines.getD (model.cursor.line + 1) ""
-        let lines := replaceLineRange model.lines model.cursor.line (model.cursor.line + 2) [line ++ next]
-        setMessage { model with lines := lines, dirty := true } "Joined next line."
+        let endPos : TextPos := { line := model.cursor.line + 1, col := 0 }
+        setMessage (commitEdit model model.cursor endPos "") "Joined next line."
       else model
+
+  /-- Reverses the latest edit by applying the inverse splice. -/
+  def undoEdit (model : EditorState) : EditorState :=
+    match model.undoStack with
+    | [] => setMessage model "Nothing to undo."
+    | diff :: rest =>
+        let insertedEnd := endAfterText diff.startPos diff.insertedText
+        let restored := replaceRangeRaw model diff.startPos insertedEnd diff.removedText
+        let redoStack := diff :: model.redoStack
+        let dirty := diff.revisionBefore != model.savedRevision
+        let cursor := diff.cursorBefore
+        let selectionAnchor := diff.selectionBefore
+        let revision := diff.revisionBefore
+        let restored := { restored with cursor := cursor }
+        let restored := { restored with selectionAnchor := selectionAnchor }
+        let restored := { restored with revision := revision }
+        let restored := { restored with undoStack := rest }
+        let restored := { restored with redoStack := redoStack }
+        let restored := { restored with dirty := dirty }
+        setMessage (ensureVisible restored) "Undo."
+
+  /-- Reapplies the latest undone edit. -/
+  def redoEdit (model : EditorState) : EditorState :=
+    match model.redoStack with
+    | [] => setMessage model "Nothing to redo."
+    | diff :: rest =>
+        let removedEnd := endAfterText diff.startPos diff.removedText
+        let restored := replaceRangeRaw model diff.startPos removedEnd diff.insertedText
+        let undoStack := diff :: model.undoStack
+        let dirty := diff.revisionAfter != model.savedRevision
+        let cursor := diff.cursorAfter
+        let selectionAnchor := diff.selectionAfter
+        let revision := diff.revisionAfter
+        let restored := { restored with cursor := cursor }
+        let restored := { restored with selectionAnchor := selectionAnchor }
+        let restored := { restored with revision := revision }
+        let restored := { restored with undoStack := undoStack }
+        let restored := { restored with redoStack := rest }
+        let restored := { restored with dirty := dirty }
+        setMessage (ensureVisible restored) "Redo."
 
   def selectAll (model : EditorState) : EditorState :=
     let endLine := lastLine model
@@ -286,6 +374,8 @@ namespace Editor
       let next :=
         match key with
         | .ctrl 'a' => selectAll model
+        | .ctrl 'z' => undoEdit model
+        | .ctrl 'y' => redoEdit model
         | .left => moveLeft model
         | .right => moveRight model
         | .up => moveVertical model (model.cursor.line - 1)
@@ -321,7 +411,8 @@ namespace Editor
     match key with
     | .ctrl 's' =>
         saveFile model
-        pure (.continue (setMessage { model with dirty := false } "Saved."))
+        pure (.continue (setMessage
+          { model with savedRevision := model.revision, dirty := false } "Saved."))
     | .ctrl 'c' =>
         match selectionRange? model with
         | none => pure (.continue (setMessage model "Nothing selected."))
@@ -360,26 +451,40 @@ namespace Editor
     | fuel + 1 =>
         if screenRow >= model.screenSize.rows then screen
         else
-          let documentLine := model.scrollTop + screenRow - 2
+          let documentLine := model.scrollTop + screenRow - 1
           let screen := renderLineChars model screen documentLine screenRow 0 (model.screenSize.cols + 1)
           renderRows model screen (screenRow + 1) fuel
+
+  /-- Paints a complete screen row with text and trailing cells in the chrome style. -/
+  def renderChromeRow (screen : Screen) (row : Nat) (text : String) : Screen :=
+    let background := String.ofList (List.replicate screen.size.cols ' ')
+    (screen.putString row 0 background chromeStyle).putString row 0 text chromeStyle
 
   /-- Renders the document, selection, status, and cursor into a screen buffer. -/
   def viewRule (model : EditorState) : Screen :=
     let screen := Screen.blank model.screenSize
-    let dirtyMark := if model.dirty then " *" else ""
-    let screen := screen.putString 0 0 ("Editor Demo — Ctrl-S saves, Esc quits" ++ dirtyMark) titleStyle
-    let screen := screen.putString 1 0 model.message messageStyle
-    let screen := renderRows model screen 2 (contentRows model.screenSize + 1)
-    if model.screenSize.rows <= 2 || model.screenSize.cols == 0 ||
+    if model.screenSize.rows == 0 then screen
+    else
+      let help := " Ctrl-S Save  Ctrl-Z/Y Undo/Redo  Shift+Arrows Select  Ctrl-C/X/V Clipboard"
+      let screen := renderChromeRow screen 0 help
+      let screen := renderRows model screen 1 (contentRows model.screenSize + 1)
+      let dirtyMark := if model.dirty then "* " else "  "
+      let location := fileName model.path ++ "  Ln " ++ toString (model.cursor.line + 1) ++
+        ", Col " ++ toString (model.cursor.col + 1)
+      let screen :=
+        if model.screenSize.rows > 1 then
+          renderChromeRow screen (model.screenSize.rows - 1)
+            (dirtyMark ++ model.message ++ "  |  " ++ location)
+        else screen
+      if model.screenSize.rows <= 2 || model.screenSize.cols == 0 ||
         model.cursor.line < model.scrollTop ||
         model.cursor.line >= model.scrollTop + contentRows model.screenSize then screen
-    else
-      let cursorRow := 2 + model.cursor.line - model.scrollTop
-      let cursorCol := model.cursor.col - model.scrollLeft
-      let pos : Pos := { row := cursorRow, col := cursorCol }
-      let cell := screen.get pos
-      screen.set pos { cell with style := cursorStyle }
+      else
+        let cursorRow := 1 + model.cursor.line - model.scrollTop
+        let cursorCol := model.cursor.col - model.scrollLeft
+        let pos : Pos := { row := cursorRow, col := cursorCol }
+        let cell := screen.get pos
+        screen.set pos { cell with style := cursorStyle }
 
   def resizeEditor (size : Size) (model : EditorState) : EditorState :=
     ensureVisible { model with screenSize := size }
