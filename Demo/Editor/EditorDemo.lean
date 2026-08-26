@@ -51,6 +51,8 @@ namespace Editor
     undoStack : List EditDiff := []
     redoStack : List EditDiff := []
     message : String := "Ctrl-S saves. Shift+arrows select. Ctrl-C/V copy/paste."
+    /-- Whether the terminal supports truecolor, enabling the light current-line highlight. -/
+    richColor : Bool := true
 
   /-- Shared full-width style for the help header and status footer. -/
   def chromeStyle : Style :=
@@ -61,6 +63,10 @@ namespace Editor
 
   def selectionStyle : Style :=
     { fg := some Color.black, bg := some Color.cyan, bold := false }
+
+  /-- Soft light highlight for the line containing the cursor (truecolor terminals only). -/
+  def currentLineStyle : Style :=
+    { fg := some Color.black, bg := some (Color.rgb 255 246 178), bold := false }
 
   /-- Lifts a filesystem command into the editor's combined effect signature. -/
   def withFileEffects (command : Command FileSystem.Effect α) : Command EditorEffect α :=
@@ -183,6 +189,75 @@ namespace Editor
   def movePageDown (model : EditorState) (selecting : Bool := false) : EditorState :=
     let amount := max 1 (contentRows model.screenSize)
     moveVertical model (model.cursor.line + amount) selecting
+
+  /-- Returns whether a character starts or belongs to a word (non-whitespace). -/
+  def isWordChar (ch : Char) : Bool :=
+    !ch.isWhitespace
+
+  /--
+  Scans `chars` from reversed-index `i` while `p` holds, returning the index
+  just past the last satisfying character (or `chars.length`).
+  -/
+  def skipWhile : List Char -> Nat -> (Char -> Bool) -> Nat
+    | [], i, _ => i
+    | c :: rest, i, p =>
+        if p c then skipWhile rest (i + 1) p else i
+
+  /--
+  Returns the column of the first character of the next word at or after `col`,
+  or `none` when the line has no further word. Whitespace separates words.
+  -/
+  def nextWordStart? (text : String) (col : Nat) : Option Nat :=
+    let chars := text.toList
+    let len := chars.length
+    if col >= len then none
+    else
+      -- Past the rest of the current word if we start inside one.
+      let afterCurrent :=
+        if (chars.getD col ' ').isWhitespace then col
+        else skipWhile (chars.drop col) (col + 1) isWordChar
+      let afterGap := skipWhile (chars.drop afterCurrent) afterCurrent (fun ch => ch.isWhitespace)
+      if afterGap < len then some afterGap else none
+
+  /--
+  Returns the column where the word ending just before `col` begins,
+  or `none` when nothing but whitespace precedes `col`. Whitespace separates words.
+  -/
+  def prevWordStart? (text : String) (col : Nat) : Option Nat :=
+    if col == 0 then none
+    else
+      let reversedPrefix := (text.toList.take col).reverse
+      let trailingWs := skipWhile reversedPrefix 0 (fun ch => ch.isWhitespace)
+      let wordRun := skipWhile (reversedPrefix.drop trailingWs) trailingWs isWordChar
+      if wordRun == trailingWs then none
+      else some (col - wordRun)
+
+  /-- Moves the cursor to the start of the next word, or the next line at a boundary. -/
+  def moveWordRight (model : EditorState) (selecting : Bool := false) : EditorState :=
+    let cursor := model.cursor
+    let atLineEnd := cursor.col >= lineLength model cursor.line
+    let target : TextPos :=
+      if atLineEnd then
+        if cursor.line < lastLine model then { line := cursor.line + 1, col := 0 } else cursor
+      else
+        match nextWordStart? (model.lines.getD cursor.line "") cursor.col with
+        | some col => { cursor with col := col }
+        | none =>
+            if cursor.line < lastLine model then { line := cursor.line + 1, col := 0 } else cursor
+    moveTo model target selecting
+
+  /-- Moves the cursor to the start of the current or previous word, or the previous line at a boundary. -/
+  def moveWordLeft (model : EditorState) (selecting : Bool := false) : EditorState :=
+    let cursor := model.cursor
+    let target : TextPos :=
+      if cursor.col == 0 then
+        if cursor.line > 0 then { line := cursor.line - 1, col := lineLength model (cursor.line - 1) } else cursor
+      else
+        match prevWordStart? (model.lines.getD cursor.line "") cursor.col with
+        | some col => { cursor with col := col }
+        | none =>
+            if cursor.line > 0 then { line := cursor.line - 1, col := lineLength model (cursor.line - 1) } else cursor
+    moveTo model target selecting
 
   def stringTake (text : String) (count : Nat) : String :=
     String.ofList (text.toList.take count)
@@ -378,6 +453,8 @@ namespace Editor
         | .ctrl 'y' => redoEdit model
         | .left => moveLeft model
         | .right => moveRight model
+        | .ctrlLeft => moveWordLeft model
+        | .ctrlRight => moveWordRight model
         | .up => moveVertical model (model.cursor.line - 1)
         | .down => moveVertical model (model.cursor.line + 1)
         | .home => moveTo model { model.cursor with col := 0 }
@@ -441,7 +518,9 @@ namespace Editor
           let chars := (model.lines.getD documentLine "").toList
           let ch := chars.getD documentCol ' '
           let style := if positionSelected model { line := documentLine, col := documentCol }
-            then selectionStyle else Style.plain
+            then selectionStyle
+            else if documentLine == model.cursor.line && model.richColor then currentLineStyle
+            else Style.plain
           renderLineChars model (screen.putChar screenRow screenCol ch style)
             documentLine screenRow (screenCol + 1) fuel
 
@@ -489,13 +568,13 @@ namespace Editor
   def resizeEditor (size : Size) (model : EditorState) : EditorState :=
     ensureVisible { model with screenSize := size }
 
-  def initModel (path : String) (size : Size) (fileLines : Array String) : EditorState :=
+  def initModel (path : String) (size : Size) (fileLines : Array String) (richColor : Bool) : EditorState :=
     let lines := if fileLines.isEmpty then #[""] else fileLines
-    ensureVisible { path := path, lines := lines, screenSize := size }
+    ensureVisible { path := path, lines := lines, screenSize := size, richColor := richColor }
 
-  def editorApp (size : Size) (path : String) (fileLines : Array String) :
+  def editorApp (size : Size) (path : String) (fileLines : Array String) (richColor : Bool) :
       App EditorState EditorEffect :=
-    { init := initModel path size fileLines
+    { init := initModel path size fileLines richColor
       view := viewRule
       update := updateEditor
       resize := resizeEditor }
@@ -506,10 +585,11 @@ namespace Editor
     match cmdLineArgs with
     | [path] =>
         let fileLines ← (readFileLines path).run FileSystem.interpret
+        let richColor ← Terminal.supportsTruecolor
         let clipboard ← Clipboard.Store.create
         let interpret : Command.Interpreter EditorEffect :=
           Sum.interpret FileSystem.interpret clipboard.interpret
-        App.run interpret (editorApp size path fileLines)
+        App.run interpret (editorApp size path fileLines richColor)
     | _ => IO.Process.exit 1
 
 end Editor

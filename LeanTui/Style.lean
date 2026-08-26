@@ -13,6 +13,8 @@ inductive Color where
   | cyan
   | white
   | orange
+  /-- A 24-bit truecolor value (each channel 0-255), for richer terminals. -/
+  | rgb (r g b : Nat)
 deriving BEq, Repr
 
 namespace Color
@@ -28,6 +30,7 @@ def fgCode : Color -> String
   | cyan => "36"
   | white => "37"
   | orange => "38;5;208"
+  | rgb r g b => "38;2;" ++ toString r ++ ";" ++ toString g ++ ";" ++ toString b
 
 /-- Returns the ANSI background color code for a color. -/
 def bgCode : Color -> String
@@ -40,6 +43,7 @@ def bgCode : Color -> String
   | cyan => "46"
   | white => "47"
   | orange => "48;5;208"
+  | rgb r g b => "48;2;" ++ toString r ++ ";" ++ toString g ++ ";" ++ toString b
 
 end Color
 

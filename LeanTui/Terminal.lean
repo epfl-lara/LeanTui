@@ -116,6 +116,22 @@ Tries BSD/macOS `/dev/tty`, GNU/Linux `/dev/tty`, then inherited standard input.
 def size? : IO (Option Size) := do
   firstStty? sizeOn? sttyTargets
 
+/--
+Detects whether the terminal advertises truecolor (24-bit) support.
+Returns `true` when `COLORTERM` is `truecolor`/`24bit`, or when `TERM`
+ends in or contains `-direct`/`truecolor`. Falls back to `false` otherwise.
+-/
+def supportsTruecolor : IO Bool := do
+  let colorterm := (← IO.getEnv "COLORTERM").getD ""
+  let colortermOK :=
+    let ct := colorterm.toLower
+    ct == "truecolor" || ct == "24bit"
+  let term := (← IO.getEnv "TERM").getD ""
+  let termOK :=
+    let t := term.toLower
+    t.contains "-direct" || t.contains "truecolor"
+  pure (colortermOK || termOK)
+
 /-- Captures the current terminal mode for one `stty` target. -/
 def captureModeOn (target : SttyTarget) : IO (Option Mode) := do
   try

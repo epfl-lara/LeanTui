@@ -44,6 +44,14 @@ inductive Key where
   | pageDown
   /-- Forward delete key. -/
   | delete
+  /-- Ctrl-modified Left arrow (word-left). -/
+  | ctrlLeft
+  /-- Ctrl-modified Right arrow (word-right). -/
+  | ctrlRight
+  /-- Ctrl-modified Up arrow. -/
+  | ctrlUp
+  /-- Ctrl-modified Down arrow. -/
+  | ctrlDown
   /-- Shift-modified Up arrow. -/
   | shiftUp
   /-- Shift-modified Down arrow. -/
@@ -122,6 +130,14 @@ def decodeEscape : List Char -> Key
   | ['\x1b', 'O', 'H'] => home
   | ['\x1b', 'O', 'F'] => endKey
   | ['\x1b', '[', '3', '~'] => delete
+  | ['\x1b', '[', '1', ';', '5', 'A'] => ctrlUp
+  | ['\x1b', '[', '1', ';', '5', 'B'] => ctrlDown
+  | ['\x1b', '[', '1', ';', '5', 'C'] => ctrlRight
+  | ['\x1b', '[', '1', ';', '5', 'D'] => ctrlLeft
+  | ['\x1b', 'O', 'a'] => ctrlUp
+  | ['\x1b', 'O', 'b'] => ctrlDown
+  | ['\x1b', 'O', 'c'] => ctrlRight
+  | ['\x1b', 'O', 'd'] => ctrlLeft
   | ['\x1b', '[', '1', ';', '2', 'A'] => shiftUp
   | ['\x1b', '[', '1', ';', '2', 'B'] => shiftDown
   | ['\x1b', '[', '1', ';', '2', 'C'] => shiftRight
