@@ -195,17 +195,18 @@ namespace Editor
     !ch.isWhitespace
 
   /--
-  Scans `chars` from reversed-index `i` while `p` holds, returning the index
-  just past the last satisfying character (or `chars.length`).
+  Scans {name}`chars` from reversed-index {name}`i` while {name}`p` holds, returning the index
+  just past the last satisfying character (or {lean}`chars.length`).
   -/
-  def skipWhile : List Char -> Nat -> (Char -> Bool) -> Nat
-    | [], i, _ => i
-    | c :: rest, i, p =>
+  def skipWhile (chars : List Char) (i : Nat) (p : Char -> Bool) : Nat :=
+    match chars with
+    | [] => i
+    | c :: rest =>
         if p c then skipWhile rest (i + 1) p else i
 
   /--
-  Returns the column of the first character of the next word at or after `col`,
-  or `none` when the line has no further word. Whitespace separates words.
+  Returns the column of the first character of the next word at or after {name}`col`,
+  or {lean}`none` when the line has no further word. Whitespace separates words.
   -/
   def nextWordStart? (text : String) (col : Nat) : Option Nat :=
     let chars := text.toList
@@ -220,8 +221,8 @@ namespace Editor
       if afterGap < len then some afterGap else none
 
   /--
-  Returns the column where the word ending just before `col` begins,
-  or `none` when nothing but whitespace precedes `col`. Whitespace separates words.
+  Returns the column where the word ending just before {name}`col` begins,
+  or {lean}`none` when nothing but whitespace precedes {name}`col`. Whitespace separates words.
   -/
   def prevWordStart? (text : String) (col : Nat) : Option Nat :=
     if col == 0 then none

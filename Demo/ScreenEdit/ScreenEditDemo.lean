@@ -25,7 +25,7 @@ namespace ScreenEdit
     let content ← FileSystem.readFile path
     pure ((content.split '\n').map String.Slice.toString).toArray
 
-  /-- Clamp a terminal coordinate to the valid range below {lit}`limit`. -/
+  /-- Clamp a terminal coordinate to the valid range below {name}`limit`. -/
   def clampTo (limit value : Nat) : Nat :=
     if value >= limit then limit - 1 else value
 
